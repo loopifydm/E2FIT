@@ -24,7 +24,8 @@ document.getElementById("loginBtn").onclick=async()=>{
   showApp();await refresh();
 };
 document.getElementById("logout").onclick=async()=>{await supabaseClient.auth.signOut();location.reload();};
-function monthlyEndDate(startDate){let d=new Date(startDate+"T00:00:00");let count=0;while(count<26){if(d.getDay()!==0)count++;if(count<26)d.setDate(d.getDate()+1);}return d.toISOString().slice(0,10);}\nasync function refresh(){await generateToday();await loadOrders();await loadCustomers();}
+function monthlyEndDate(startDate){let d=new Date(startDate+"T00:00:00");let count=0;while(count<26){if(d.getDay()!==0)count++;if(count<26)d.setDate(d.getDate()+1);}return d.toISOString().slice(0,10);}
+async function refresh(){await generateToday();await loadOrders();await loadCustomers();}
 async function generateToday(){const {error}=await supabaseClient.rpc("e2fit_generate_today_deliveries");if(error)console.warn("Delivery generation:",error.message);}
 async function loadOrders(){
   const today=new Date().toISOString().slice(0,10);

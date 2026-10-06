@@ -24,7 +24,7 @@ document.getElementById("loginBtn").onclick=async()=>{
   showApp();await refresh();
 };
 document.getElementById("logout").onclick=async()=>{await supabaseClient.auth.signOut();location.reload();};
-function monthlyEndDate(startDate){let d=new Date(startDate+"T00:00:00");let count=0;while(count<26){if(d.getDay()!==0)count++;if(count<26)d.setDate(d.getDate()+1);}return d.toISOString().slice(0,10);}
+function monthlyEndDate(startDate){let d=new Date(startDate+"T00:00:00");let count=0;while(count<26){if(d.getDay()!==0)count++;if(count<26)d.setDate(d.getDate()+1);}return d.toISOString().slice(0,10);}function weeklyEndDate(startDate){let d=new Date(startDate+"T00:00:00");let count=0;while(count<6){if(d.getDay()!==0)count++;if(count<6)d.setDate(d.getDate()+1);}return d.toISOString().slice(0,10);}
 async function refresh(){await generateToday();await loadOrders();await loadCustomers();await loadSubscriptions();}
 async function generateToday(){const {error}=await supabaseClient.rpc("e2fit_generate_today_deliveries");if(error)console.warn("Delivery generation:",error.message);}
 async function loadOrders(){
@@ -33,9 +33,9 @@ async function loadOrders(){
   if(error){console.error(error);alert("Could not load deliveries: "+error.message);return;}orders=data||[];render();
 }
 async function loadCustomers(){
-  const {data,error}=await supabaseClient.from("e2fit_subscriptions").select("id,box,plan,delivery_time,status,start_date,end_date,e2fit_customers(name,phone)").eq("status","active").order("created_at",{ascending:false});
+  const {data,error}=await supabaseClient.from("e2fit_subscriptions").select("id,customer_id,box,plan,delivery_time,status,start_date,end_date,e2fit_customers(name,phone)").eq("status","active").order("created_at",{ascending:false});
   if(error){console.error(error);return;}
-  document.getElementById("customerRows").innerHTML=(data||[]).map(s=>{const c=s.e2fit_customers||{};return "<tr><td><strong>"+escapeHtml(c.name||"—")+"</strong><small>"+escapeHtml(c.phone||"")+"</small></td><td>"+escapeHtml(s.box)+"</td><td>"+escapeHtml(s.plan)+"</td><td>"+escapeHtml(s.delivery_time)+"</td><td><span class='pill Active'>Active</span></td></tr>";}).join("")||"<tr><td colspan='5'>No active subscriptions yet.</td></tr>";
+  document.getElementById("customerRows").innerHTML=(data||[]).map(s=>{const c=s.e2fit_customers||{};return "<tr><td><strong>"+escapeHtml(c.name||"—")+"</strong><small>"+escapeHtml(c.phone||"")+"</small></td><td>"+escapeHtml(s.box)+"</td><td>"+escapeHtml(s.plan)+"</td><td>"+escapeHtml(s.delivery_time)+"</td><td><span class='pill Active'>Active</span></td><td><button class='status-btn delete-customer' onclick="deleteCustomer(\'"+s.customer_id+"\')">Delete</button></td></tr>";}).join("")||"<tr><td colspan='6'>No active subscriptions yet.</td></tr>";
 }
 async function loadSubscriptions(){
   const {data,error}=await supabaseClient.from("e2fit_subscriptions").select("id,box,plan,delivery_time,status,start_date,end_date,e2fit_customers(name,phone)").order("created_at",{ascending:false});
@@ -52,7 +52,7 @@ function render(){
     return "<div class='order'><div class='customer'><strong>"+escapeHtml(c.name||"Customer")+"</strong><small>"+escapeHtml(c.phone||"")+" · "+escapeHtml(o.address||c.address||"")+"</small></div><div><strong>"+escapeHtml(o.box)+"</strong><div class='muted'>"+escapeHtml(o.delivery_time)+"</div></div><div><strong>"+escapeHtml(o.status)+"</strong><div class='muted'>"+escapeHtml(o.delivery_date)+"</div></div><div class='status-action'><span class='pill "+statusClass(o.status)+"'>"+escapeHtml(o.status)+"</span> "+(next?"<button class='status-btn' onclick=\"advance('"+o.id+"','"+next+"')\">Next →</button>":"")+"</div></div>";
   }).join("")||"<div style='padding:30px;color:#879189'>No deliveries found.</div>";
 }
-function statusClass(status){return status==="Out for Delivery"?"Out":status.replaceAll(" ","");}
+async function deleteCustomer(customerId){if(!customerId)return;if(!confirm("Delete this customer and all their subscriptions and deliveries? This cannot be undone."))return;const {error}=await supabaseClient.from("e2fit_customers").delete().eq("id",customerId);if(error){alert("Could not delete customer: "+error.message);return;}await refresh();}function statusClass(status){return status==="Out for Delivery"?"Out":status.replaceAll(" ","");}
 async function advance(id,next){const {error}=await supabaseClient.from("e2fit_deliveries").update({status:next,updated_at:new Date().toISOString()}).eq("id",id);if(error){alert("Could not update delivery: "+error.message);return;}await loadOrders();}
 document.getElementById("filter").onchange=render;
 const modal=document.getElementById("orderModal");document.getElementById("newOrder").onclick=()=>modal.classList.remove("hidden");document.getElementById("closeModal").onclick=()=>modal.classList.add("hidden");
@@ -67,7 +67,7 @@ document.getElementById("saveOrder").onclick=async()=>{
     address:document.getElementById("address")
   };
   if(Object.values(fields).some(el=>!el)){alert("Order form is not loaded correctly. Please refresh the page.");return;}
-  const name=fields.name.value.trim(),phone=fields.phone.value.trim(),box=fields.box.value,plan=fields.plan.value,delivery=fields.delivery.value,address=fields.address.value.trim();
+  const name=fields.name.value.trim(),phone=fields.phone.value.trim(),box=fields.box.value,planLabel=fields.plan.value,plan=planLabel.startsWith("Weekly")?"Weekly":planLabel.startsWith("Monthly")?"Monthly":"Daily",delivery=fields.delivery.value,address=fields.address.value.trim();
   if(!name||!phone||!address){alert("Name, phone and address are required.");return;}
   button.disabled=true;button.textContent="Saving…";
   try{
@@ -76,7 +76,7 @@ document.getElementById("saveOrder").onclick=async()=>{
     const {data:customer,error:e1}=await supabaseClient.from("e2fit_customers").insert({name,phone,address}).select("id").single();
     if(e1)throw e1;
     if(!customer?.id)throw new Error("Customer record was not created.");
-    const {data:subscription,error:e2}=await supabaseClient.from("e2fit_subscriptions").insert({customer_id:customer.id,box,plan,daily_price:prices[box][0],monthly_price:prices[box][1],start_date:today,end_date:plan==="Monthly"?monthlyEndDate(today):today,delivery_time:delivery}).select("id").single();
+    const {data:subscription,error:e2}=await supabaseClient.from("e2fit_subscriptions").insert({customer_id:customer.id,box,plan,daily_price:prices[box][0],monthly_price:prices[box][1],start_date:today,end_date:plan==="Monthly"?monthlyEndDate(today):plan==="Weekly"?weeklyEndDate(today):today,delivery_time:delivery}).select("id").single();
     if(e2)throw e2;
     if(!subscription?.id)throw new Error("Subscription record was not created.");
     const {error:e3}=await supabaseClient.from("e2fit_deliveries").insert({customer_id:customer.id,subscription_id:subscription.id,delivery_date:today,delivery_time:delivery,box,address});

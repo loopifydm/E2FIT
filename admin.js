@@ -39,7 +39,7 @@ document.getElementById("logout").addEventListener("click",async()=>{await supab
 
 function monthlyEndDate(startDate){let d=new Date(startDate+"T00:00:00"),count=0;while(count<26){if(d.getDay()!==0)count++;if(count<26)d.setDate(d.getDate()+1);}return d.toISOString().slice(0,10);}
 function weeklyEndDate(startDate){let d=new Date(startDate+"T00:00:00"),count=0;while(count<6){if(d.getDay()!==0)count++;if(count<6)d.setDate(d.getDate()+1);}return d.toISOString().slice(0,10);}
-async function refresh(){await generateToday();await loadEnquiries();await loadOrders();await loadCustomers();await loadSubscriptions();await loadInvoices();}
+async function refresh(){await generateToday();await loadEnquiries();await loadOrders();await loadCustomers();await loadSubscriptions();await loadSubscriberCalendarOptions();await loadInvoices();}
 async function loadEnquiries(){
   const {data,error}=await supabaseClient.from("e2fit_enquiries").select("*").order("created_at",{ascending:false});
   if(error){console.error(error);return;}
@@ -65,6 +65,47 @@ async function loadSubscriptions(){
   if(error){console.error(error);return;}
   document.getElementById("subscriptionRows").innerHTML=(data||[]).map(s=>{const c=s.e2fit_customers||{};return "<tr><td><strong>"+escapeHtml(c.name||"—")+"</strong><small>"+escapeHtml(c.phone||"")+"</small></td><td>"+escapeHtml(s.box)+"</td><td>"+escapeHtml(s.plan)+"</td><td>"+escapeHtml(s.delivery_time)+"</td><td>"+escapeHtml(s.start_date)+"</td><td>"+escapeHtml(s.end_date)+"</td><td><span class='pill "+escapeHtml(s.status)+"'>"+escapeHtml(s.status)+"</span></td></tr>";}).join("")||"<tr><td colspan='7'>No subscriptions yet.</td></tr>";
 }
+async function loadSubscriberCalendarOptions(){
+  const {data,error}=await supabaseClient.from("e2fit_subscriptions").select("id,box,plan,start_date,end_date,delivery_time,status,e2fit_customers(name,phone)").not("invoice_id","is",null).order("created_at",{ascending:false});
+  if(error){console.error(error);return;}
+  const select=document.getElementById("calendarSubscriber"),current=select.value;
+  select.innerHTML='<option value="">Select subscriber</option>'+(data||[]).map(s=>{const c=s.e2fit_customers||{};return '<option value="'+s.id+'">'+escapeHtml(c.name||"Customer")+' — '+escapeHtml(s.box)+' ('+escapeHtml(s.plan)+')</option>';}).join("");
+  if(current && (data||[]).some(s=>s.id===current)) select.value=current;
+  window.e2fitCalendarSubscriptions=data||[];
+  if(!select.value && data?.length){select.value=data[0].id;}
+  if(select.value) await renderSubscriberCalendar();
+}
+function calendarMonthValue(date){return String(date||"").slice(0,7);}
+async function renderSubscriberCalendar(){
+  const select=document.getElementById("calendarSubscriber"),sub=(window.e2fitCalendarSubscriptions||[]).find(s=>s.id===select.value),month=document.getElementById("calendarMonth").value;
+  const box=document.getElementById("subscriberCalendar");
+  if(!sub){box.innerHTML='<div class="calendar-empty">Select a subscriber to view their delivery calendar.</div>';return;}
+  let monthValue=month||calendarMonthValue(sub.start_date);
+  if(!monthValue)monthValue=new Date().toISOString().slice(0,7);
+  document.getElementById("calendarMonth").value=monthValue;
+  const monthStart=monthValue+"-01",monthEnd=new Date(Number(monthValue.slice(0,4)),Number(monthValue.slice(5,7)),0).toISOString().slice(0,10);
+  const start=monthStart>sub.start_date?monthStart:sub.start_date,end=monthEnd<sub.end_date?monthEnd:sub.end_date;
+  if(start>end){box.innerHTML='<div class="calendar-empty">No delivery days for this month.</div>';return;}
+  const {data,error}=await supabaseClient.from("e2fit_deliveries").select("id,delivery_date,status").eq("subscription_id",sub.id).gte("delivery_date",start).lte("delivery_date",end);
+  if(error){console.error(error);box.innerHTML='<div class="calendar-empty">Could not load delivery calendar.</div>';return;}
+  const byDate={};(data||[]).forEach(d=>byDate[d.delivery_date]=d);
+  const dates=[];let d=new Date(start+"T00:00:00"),last=new Date(end+"T00:00:00");
+  while(d<=last){if(d.getDay()!==0)dates.push(d.toISOString().slice(0,10));d.setDate(d.getDate()+1);}
+  box.innerHTML='<div class="calendar-summary"><strong>'+escapeHtml((sub.e2fit_customers||{}).name||"Subscriber")+'</strong><span>'+escapeHtml(sub.box)+' · '+escapeHtml(sub.plan)+' · '+escapeHtml(sub.delivery_time)+'</span><span>Plan: '+escapeHtml(sub.start_date)+' to '+escapeHtml(sub.end_date)+'</span></div><div class="calendar-grid">'+dates.map(date=>{const rec=byDate[date],done=rec?.status==="Delivered";const label=new Date(date+"T00:00:00").toLocaleDateString("en-IN",{weekday:"short",day:"2-digit",month:"short"});return '<label class="calendar-day '+(done?"done":"")+'"><input type="checkbox" '+(done?"checked":"")+' data-delivery-id="'+(rec?.id||"")+'" data-subscription-id="'+sub.id+'" data-date="'+date+'"><span class="day-check">'+(done?"✓":"")+'</span><span class="day-info"><strong>'+label+'</strong><small>'+(done?"Box brought":"Not brought")+'</small></span></label>';}).join("")+'</div>';
+  box.querySelectorAll('input[type="checkbox"]').forEach(input=>input.addEventListener("change",()=>toggleCalendarDelivery(input)));
+}
+async function toggleCalendarDelivery(input){
+  const status=input.checked?"Delivered":"Pending",payload={subscription_id:input.dataset.subscriptionId,customer_id:null,delivery_date:input.dataset.date,delivery_time:"Breakfast",status,updated_at:new Date().toISOString()};
+  const sub=(window.e2fitCalendarSubscriptions||[]).find(s=>s.id===input.dataset.subscriptionId);
+  if(!sub)return;
+  payload.customer_id=sub.customer_id||null;payload.delivery_time=sub.delivery_time;payload.box=sub.box;payload.address="";
+  let result;
+  if(input.dataset.deliveryId) result=await supabaseClient.from("e2fit_deliveries").update({status,updated_at:new Date().toISOString()}).eq("id",input.dataset.deliveryId);
+  else result=await supabaseClient.from("e2fit_deliveries").insert(payload).select("id").single();
+  if(result.error){alert("Could not save delivery status: "+result.error.message);input.checked=!input.checked;return;}
+  await renderSubscriberCalendar();
+}
+
 function render(){
   const filter=document.getElementById("filter").value,visible=filter==="All"?orders:orders.filter(o=>o.status===filter);
   document.getElementById("total").textContent=orders.length;
@@ -79,6 +120,8 @@ async function deleteCustomer(id){if(!id||!confirm("Delete this customer and all
 
 document.getElementById("filter").addEventListener("change",render);
 document.getElementById("enquiryFilter")?.addEventListener("change",loadEnquiries);
+document.getElementById("calendarSubscriber")?.addEventListener("change",()=>{const sub=(window.e2fitCalendarSubscriptions||[]).find(s=>s.id===document.getElementById("calendarSubscriber").value);if(sub)document.getElementById("calendarMonth").value=calendarMonthValue(sub.start_date);renderSubscriberCalendar();});
+document.getElementById("calendarMonth")?.addEventListener("change",renderSubscriberCalendar);
 const invoicePrices={"Mixed Box":{Daily:60,Weekly:360,Monthly:1499},"Medium Box":{Daily:80,Weekly:480,Monthly:1999},"Premium Box":{Daily:100,Weekly:600,Monthly:2499},"Premium Pro Box":{Daily:120,Weekly:720,Monthly:2999}};
 async function loadInvoices(){
   const {data,error}=await supabaseClient.from("e2fit_invoices").select("*").order("created_at",{ascending:false});

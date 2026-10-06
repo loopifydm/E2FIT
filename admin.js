@@ -95,7 +95,8 @@ document.getElementById("filter").addEventListener("change",render);
 const modal=document.getElementById("orderModal");
 document.getElementById("newOrder").addEventListener("click",()=>modal.classList.remove("hidden"));
 document.getElementById("closeModal").addEventListener("click",()=>modal.classList.add("hidden"));
-document.getElementById("saveOrder").addEventListener("click",saveOrder);\ndocument.getElementById("saveMenu").addEventListener("click",saveMenu);
+document.getElementById("saveOrder").addEventListener("click",saveOrder);
+document.getElementById("saveMenu").addEventListener("click",saveMenu);
 async function saveOrder(){
   const fields={name:document.getElementById("name"),phone:document.getElementById("phone"),box:document.getElementById("box"),plan:document.getElementById("plan"),delivery:document.getElementById("delivery"),address:document.getElementById("address")};
   const button=document.getElementById("saveOrder");

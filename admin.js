@@ -118,16 +118,26 @@ async function invoiceNumber(){const {data,error}=await supabaseClient.rpc("e2fi
 async function generateInvoice(){
   const name=document.getElementById("invoiceCustomer").value.trim(),phone=document.getElementById("invoicePhone").value.trim(),address=document.getElementById("invoiceAddress").value.trim(),box=document.getElementById("invoiceBox").value,plan=document.getElementById("invoicePlan").value,amount=Number(document.getElementById("invoiceAmount").value||0),date=document.getElementById("invoiceDate").value||new Date().toISOString().slice(0,10);
   if(!name){alert("Enter the customer name.");return;}
-  const planKey=invoicePlanKey();let invoiceNo=editingInvoiceNumber;
-  if(!invoiceNo){try{invoiceNo=await invoiceNumber();}catch(error){alert("Could not generate invoice number: "+error.message);return;}}
-  const payload={customer_name:name,phone,address,box,plan:planKey,amount,invoice_date:date,updated_at:new Date().toISOString()};
-  let result;
-  if(editingInvoiceId) result=await supabaseClient.from("e2fit_invoices").update(payload).eq("id",editingInvoiceId);
-  else result=await supabaseClient.from("e2fit_invoices").insert({...payload,invoice_number:invoiceNo}).select("id").single();
+  const planKey=invoicePlanKey();
+  let result,invoiceNo;
+  if(editingInvoiceId){
+    invoiceNo=editingInvoiceNumber;
+    const payload={customer_name:name,phone,address,box,plan:planKey,amount,invoice_date:date,updated_at:new Date().toISOString()};
+    result=await supabaseClient.from("e2fit_invoices").update(payload).eq("id",editingInvoiceId);
+    if(!result.error){await renderInvoice(invoiceNo);await loadInvoices();}
+    if(result.error){alert("Could not update invoice: "+result.error.message);return;}
+    editingInvoiceId=null;editingInvoiceNumber=null;
+    document.getElementById("generateInvoice").textContent="Generate Invoice";
+    return;
+  }
+  try{invoiceNo=await invoiceNumber();}catch(error){alert("Could not generate invoice number: "+error.message);return;}
+  const payload={invoice_number:invoiceNo,customer_name:name,phone,address,box,plan:planKey,amount,invoice_date:date,updated_at:new Date().toISOString()};
+  result=await supabaseClient.from("e2fit_invoices").insert(payload).select("id").single();
   if(result.error){alert("Could not save invoice: "+result.error.message);return;}
-  if(!editingInvoiceId&&result.data)editingInvoiceId=result.data.id;document.getElementById("generateInvoice").textContent="Update Invoice";
-  editingInvoiceNumber=invoiceNo;
-  await renderInvoice(invoiceNo);await loadInvoices();
+  await renderInvoice(invoiceNo);
+  await loadInvoices();
+  editingInvoiceId=null;editingInvoiceNumber=null;
+  document.getElementById("generateInvoice").textContent="Generate Invoice";
 }
 function printInvoice(){
   const paper=document.querySelector(".invoice-paper");if(!paper){alert("Generate an invoice first.");return;}

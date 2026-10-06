@@ -39,7 +39,15 @@ document.getElementById("logout").addEventListener("click",async()=>{await supab
 
 function monthlyEndDate(startDate){let d=new Date(startDate+"T00:00:00"),count=0;while(count<26){if(d.getDay()!==0)count++;if(count<26)d.setDate(d.getDate()+1);}return d.toISOString().slice(0,10);}
 function weeklyEndDate(startDate){let d=new Date(startDate+"T00:00:00"),count=0;while(count<6){if(d.getDay()!==0)count++;if(count<6)d.setDate(d.getDate()+1);}return d.toISOString().slice(0,10);}
-async function refresh(){await generateToday();await loadOrders();await loadCustomers();await loadSubscriptions();await loadInvoices();}
+async function refresh(){await generateToday();await loadEnquiries();await loadOrders();await loadCustomers();await loadSubscriptions();await loadInvoices();}
+async function loadEnquiries(){
+  const {data,error}=await supabaseClient.from("e2fit_enquiries").select("*").order("created_at",{ascending:false});
+  if(error){console.error(error);return;}
+  const filter=document.getElementById("enquiryFilter")?.value||"All";
+  const rows=(data||[]).filter(e=>filter==="All"||e.status===filter);
+  document.getElementById("enquiryRows").innerHTML=rows.map(e=>`<tr><td><strong>${escapeHtml(e.name)}</strong><small>${escapeHtml(e.phone||"")}<br>${escapeHtml(e.address||"")}</small></td><td>${escapeHtml(e.box)}</td><td>${escapeHtml(e.plan)}</td><td>${escapeHtml(e.delivery_time)}</td><td>₹${Number(e.price||0).toLocaleString("en-IN")}</td><td>${escapeHtml(new Date(e.created_at).toLocaleString("en-IN"))}</td><td><span class="pill ${escapeHtml(e.status)}">${escapeHtml(e.status)}</span></td><td><select class="status-select" data-enquiry-id="${e.id}"><option${e.status==="New"?" selected":""}>New</option><option${e.status==="Contacted"?" selected":""}>Contacted</option><option${e.status==="Converted"?" selected":""}>Converted</option><option${e.status==="Closed"?" selected":""}>Closed</option></select></td></tr>`).join("")||"<tr><td colspan='8'>No enquiries yet.</td></tr>";
+  document.querySelectorAll(".status-select").forEach(select=>select.addEventListener("change",async()=>{const {error}=await supabaseClient.from("e2fit_enquiries").update({status:select.value,updated_at:new Date().toISOString()}).eq("id",select.dataset.enquiryId);if(error){alert("Could not update enquiry: "+error.message);return;}await loadEnquiries();}));
+}
 async function generateToday(){const {error}=await supabaseClient.rpc("e2fit_generate_today_deliveries");if(error)console.warn(error.message);}
 async function loadOrders(){
   const today=new Date().toISOString().slice(0,10);
@@ -69,7 +77,7 @@ function statusClass(status){return status==="Out for Delivery"?"Out":status.rep
 async function advance(id,next){const {error}=await supabaseClient.from("e2fit_deliveries").update({status:next,updated_at:new Date().toISOString()}).eq("id",id);if(error){alert("Could not update delivery: "+error.message);return;}await loadOrders();}
 async function deleteCustomer(id){if(!id||!confirm("Delete this customer and all their subscriptions and deliveries?"))return;const {error}=await supabaseClient.from("e2fit_customers").delete().eq("id",id);if(error){alert("Could not delete customer: "+error.message);return;}await refresh();}
 
-document.getElementById("filter").addEventListener("change",render);
+document.getElementById("filter").addEventListener("change",render);\ndocument.getElementById("enquiryFilter")?.addEventListener("change",loadEnquiries);
 const invoicePrices={"Mixed Box":{Daily:60,Weekly:360,Monthly:1499},"Medium Box":{Daily:80,Weekly:480,Monthly:1999},"Premium Box":{Daily:100,Weekly:600,Monthly:2499},"Premium Pro Box":{Daily:120,Weekly:720,Monthly:2999}};
 async function loadInvoices(){
   const {data,error}=await supabaseClient.from("e2fit_invoices").select("*").order("created_at",{ascending:false});

@@ -83,27 +83,70 @@ async function renderSubscriberCalendar(){
   const select=document.getElementById("calendarSubscriber"),sub=(window.e2fitCalendarSubscriptions||[]).find(s=>s.id===select.value),month=document.getElementById("calendarMonth").value;
   const box=document.getElementById("subscriberCalendar");
   if(!sub){box.innerHTML='<div class="calendar-empty">Select a subscriber to view their delivery calendar.</div>';return;}
+
+  const targetDays=sub.plan==="Monthly"?26:sub.plan==="Weekly"?6:1;
   let monthValue=month||calendarMonthValue(sub.start_date);
   if(!monthValue)monthValue=new Date().toISOString().slice(0,7);
   document.getElementById("calendarMonth").value=monthValue;
-  const monthStart=monthValue+"-01",monthEnd=new Date(Number(monthValue.slice(0,4)),Number(monthValue.slice(5,7)),0).toISOString().slice(0,10);
-  const start=monthStart>sub.start_date?monthStart:sub.start_date,end=monthEnd<sub.end_date?monthEnd:sub.end_date;
-  if(start>end){box.innerHTML='<div class="calendar-empty">No delivery days for this month.</div>';return;}
-  const {data,error}=await supabaseClient.from("e2fit_deliveries").select("id,delivery_date,status").eq("subscription_id",sub.id).gte("delivery_date",start).lte("delivery_date",end);
+
+  // Load all recorded delivery days so skipped/not-brought days can carry the plan forward.
+  const {data:allRecords,error}=await supabaseClient.from("e2fit_deliveries")
+    .select("id,delivery_date,status")
+    .eq("subscription_id",sub.id)
+    .gte("delivery_date",sub.start_date)
+    .order("delivery_date",{ascending:true});
   if(error){console.error(error);box.innerHTML='<div class="calendar-empty">Could not load delivery calendar.</div>';return;}
-  const byDate={};(data||[]).forEach(d=>{if(new Date(d.delivery_date+"T00:00:00").getDay()!==0)byDate[d.delivery_date]=d;});
-  const dates=[];let d=new Date(start+"T00:00:00"),last=new Date(end+"T00:00:00");
-  while(d<=last){const iso=d.toISOString().slice(0,10);const weekday=new Date(iso+"T12:00:00Z").getUTCDay();if(weekday!==0)dates.push(iso);d.setDate(d.getDate()+1);}
+
+  const records=allRecords||[],byDate={};
+  records.forEach(r=>{if(new Date(r.delivery_date+"T12:00:00Z").getUTCDay()!==0)byDate[r.delivery_date]=r;});
+
+  // The original plan end is the normal 6/26 delivery-day horizon.
+  // Every explicitly not-brought day extends the subscription by one non-Sunday delivery day.
+  let effectiveEnd=sub.end_date;
+  let safety=0;
+  while(safety<400){
+    const skipped=Object.values(byDate).filter(r=>r.delivery_date>=sub.start_date && r.delivery_date<=effectiveEnd && r.status!=="Delivered").length;
+    let d=new Date(effectiveEnd+"T12:00:00Z"),added=0;
+    while(added<skipped){
+      d.setUTCDate(d.getUTCDate()+1);
+      if(d.getUTCDay()!==0)added++;
+    }
+    const next=d.toISOString().slice(0,10);
+    if(next===effectiveEnd)break;
+    effectiveEnd=next;safety++;
+    const newSkipped=Object.values(byDate).filter(r=>r.delivery_date>=sub.start_date && r.delivery_date<=effectiveEnd && r.status!=="Delivered").length;
+    if(newSkipped===skipped)break;
+  }
+
+  const monthStart=monthValue+"-01";
+  const monthEnd=new Date(Number(monthValue.slice(0,4)),Number(monthValue.slice(5,7)),0).toISOString().slice(0,10);
+  const start=monthStart>sub.start_date?monthStart:sub.start_date;
+  const end=monthEnd<effectiveEnd?monthEnd:effectiveEnd;
+  if(start>end){box.innerHTML='<div class="calendar-empty">No delivery days for this month.</div>';return;}
+
+  const deliveredCount=records.filter(r=>r.status==="Delivered" && r.delivery_date>=sub.start_date && r.delivery_date<=effectiveEnd).length;
+  const remaining=Math.max(0,targetDays-deliveredCount);
+
+  const dates=[];let d=new Date(start+"T12:00:00Z"),last=new Date(end+"T12:00:00Z");
+  while(d<=last){
+    const iso=d.toISOString().slice(0,10);
+    if(d.getUTCDay()!==0)dates.push(iso);
+    d.setUTCDate(d.getUTCDate()+1);
+  }
+
   const firstDay=new Date(dates[0]+"T12:00:00Z").getUTCDay();
   const leadingBlanks=firstDay===0?0:firstDay-1;
   const weekdayHeader=["Mon","Tue","Wed","Thu","Fri","Sat"].map(day=>'<div class="calendar-weekday">'+day+'</div>').join("");
   const spacers=Array.from({length:leadingBlanks},()=>'<div class="calendar-spacer"></div>').join("");
+
   const days=dates.map(date=>{
     const rec=byDate[date],done=rec?.status==="Delivered",dt=new Date(date+"T12:00:00Z");
     const label=dt.toLocaleDateString("en-IN",{weekday:"short",day:"2-digit",month:"short"});
     return '<label class="calendar-day '+(done?"done":"")+'"><input type="checkbox" '+(done?"checked":"")+' data-delivery-id="'+(rec?.id||"")+'" data-subscription-id="'+sub.id+'" data-date="'+date+'"><span class="day-check">'+(done?"✓":"")+'</span><span class="day-info"><strong>'+label+'</strong><small>'+(done?"Box brought":"Not brought")+'</small></span></label>';
   }).join("");
-  box.innerHTML='<div class="calendar-summary"><strong>'+escapeHtml((sub.e2fit_customers||{}).name||"Subscriber")+'</strong><span>'+escapeHtml(sub.box)+' · '+escapeHtml(sub.plan)+' · '+escapeHtml(sub.delivery_time)+'</span><span>Plan: '+escapeHtml(sub.start_date)+' to '+escapeHtml(sub.end_date)+'</span></div><div class="calendar-scroll"><div class="calendar-grid">'+weekdayHeader+spacers+days+'</div></div>';
+
+  const statusText=remaining>0?("Brought: "+deliveredCount+" / "+targetDays+" · Remaining: "+remaining):("Completed: "+targetDays+" / "+targetDays);
+  box.innerHTML='<div class="calendar-summary"><strong>'+escapeHtml((sub.e2fit_customers||{}).name||"Subscriber")+'</strong><span>'+escapeHtml(sub.box)+' · '+escapeHtml(sub.plan)+' · '+escapeHtml(sub.delivery_time)+'</span><span>'+statusText+'</span><span>Plan: '+escapeHtml(sub.start_date)+' to '+escapeHtml(effectiveEnd)+'</span></div><div class="calendar-scroll"><div class="calendar-grid">'+weekdayHeader+spacers+days+'</div></div>';
   box.querySelectorAll('input[type="checkbox"]').forEach(input=>input.addEventListener("change",()=>toggleCalendarDelivery(input)));
 }
 async function toggleCalendarDelivery(input){

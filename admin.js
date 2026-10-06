@@ -138,8 +138,108 @@ async function renderSubscriberCalendar(){
   }).join("");
 
   const statusText=remaining>0?("Brought: "+deliveredCount+" / "+targetDays+" · Remaining: "+remaining):("Completed: "+targetDays+" / "+targetDays);
-  box.innerHTML='<div class="calendar-summary"><strong>'+escapeHtml((sub.e2fit_customers||{}).name||"Subscriber")+'</strong><span>'+escapeHtml(sub.box)+' · '+escapeHtml(sub.plan)+' · '+escapeHtml(sub.delivery_time)+'</span><span>'+statusText+'</span><span>Plan: '+escapeHtml(sub.start_date)+' to '+escapeHtml(effectiveEnd)+'</span></div><div class="calendar-scroll"><div class="calendar-grid">'+weekdayHeader+spacers+days+'</div></div>';
+  box.innerHTML='<div class="calendar-summary"><strong>'+escapeHtml((sub.e2fit_customers||{}).name||"Subscriber")+'</strong><span>'+escapeHtml(sub.box)+' · '+escapeHtml(sub.plan)+' · '+escapeHtml(sub.delivery_time)+'</span><span>'+statusText+'</span><span>Plan: '+escapeHtml(sub.start_date)+' to '+escapeHtml(effectiveEnd)+'</span><button type="button" class="status-btn calendar-pdf-btn" onclick="downloadSubscriberCalendarPDF()">Download PDF</button></div><div class="calendar-scroll"><div class="calendar-grid">'+weekdayHeader+spacers+days+'</div></div>';
   box.querySelectorAll('input[type="checkbox"]').forEach(input=>input.addEventListener("change",()=>toggleCalendarDelivery(input)));
+}
+
+async function downloadSubscriberCalendarPDF(){
+  const select=document.getElementById("calendarSubscriber");
+  const sub=(window.e2fitCalendarSubscriptions||[]).find(s=>s.id===select?.value);
+  const month=document.getElementById("calendarMonth")?.value;
+  if(!sub||!month){alert("Select a subscriber and month first.");return;}
+  if(!window.jspdf?.jsPDF){alert("PDF generator is still loading. Please try again.");return;}
+
+  const {data:records,error}=await supabaseClient.from("e2fit_deliveries")
+    .select("delivery_date,status")
+    .eq("subscription_id",sub.id)
+    .gte("delivery_date",sub.start_date)
+    .order("delivery_date",{ascending:true});
+  if(error){alert("Could not load calendar data: "+error.message);return;}
+
+  const effectiveEnd=subscriberEffectiveEnd(sub.start_date,sub.plan,records||[],sub.end_date);
+  const monthStart=month+"-01";
+  const monthEnd=new Date(Number(month.slice(0,4)),Number(month.slice(5,7)),0).toISOString().slice(0,10);
+  const start=monthStart>sub.start_date?monthStart:sub.start_date;
+  const end=monthEnd<effectiveEnd?monthEnd:effectiveEnd;
+  const targetDays=subscriberTargetDays(sub.plan,sub.start_date,sub.end_date);
+  const deliveredCount=(records||[]).filter(r=>r.status==="Delivered"&&r.delivery_date>=sub.start_date&&r.delivery_date<=effectiveEnd).length;
+  const byDate={};
+  (records||[]).forEach(r=>{byDate[r.delivery_date]=r;});
+
+  const dates=[];
+  if(start<=end){
+    let d=new Date(start+"T12:00:00Z"),last=new Date(end+"T12:00:00Z");
+    while(d<=last){
+      const iso=d.toISOString().slice(0,10);
+      if(d.getUTCDay()!==0)dates.push(iso);
+      d.setUTCDate(d.getUTCDate()+1);
+    }
+  }
+
+  const {jsPDF}=window.jspdf;
+  const pdf=new jsPDF({orientation:"portrait",unit:"mm",format:"a4"});
+  const customer=(sub.e2fit_customers||{}).name||"Subscriber";
+  const monthLabel=new Date(month+"-01T12:00:00Z").toLocaleDateString("en-IN",{month:"long",year:"numeric"});
+  const pageWidth=pdf.internal.pageSize.getWidth();
+
+  pdf.setTextColor(23,63,43);
+  pdf.setFont("helvetica","bold");
+  pdf.setFontSize(18);
+  pdf.text("E2FIT Subscriber Calendar",14,18);
+  pdf.setFontSize(12);
+  pdf.text(customer,14,27);
+  pdf.setFont("helvetica","normal");
+  pdf.setFontSize(9);
+  pdf.setTextColor(80,90,82);
+  pdf.text(sub.box+" · "+sub.plan+" · "+sub.delivery_time,14,34);
+  pdf.text("Month: "+monthLabel,14,40);
+  pdf.text("Plan: "+sub.start_date+" to "+effectiveEnd,14,46);
+  pdf.text("Brought: "+deliveredCount+" / "+targetDays+" · Remaining: "+Math.max(0,targetDays-deliveredCount),14,52);
+
+  const x=14,y=62,cellW=(pageWidth-28)/6,headerH=9,cellH=22;
+  pdf.setFillColor(239,247,231);
+  pdf.setDrawColor(210,220,207);
+  pdf.setFont("helvetica","bold");
+  pdf.setFontSize(8);
+  ["Mon","Tue","Wed","Thu","Fri","Sat"].forEach((day,i)=>{
+    pdf.rect(x+i*cellW,y,cellW,headerH,"FD");
+    pdf.setTextColor(23,63,43);
+    pdf.text(day,x+i*cellW+cellW/2,y+6,{align:"center"});
+  });
+
+  let row=0,col=0;
+  if(dates.length){
+    const first=new Date(dates[0]+"T12:00:00Z").getUTCDay();
+    col=first===0?0:first-1;
+  }
+  const startCol=col;
+  for(let i=0;i<dates.length;i++){
+    const date=dates[i],rec=byDate[date],done=rec?.status==="Delivered";
+    const cx=x+col*cellW,cy=y+headerH+row*cellH;
+    pdf.setFillColor(done?239:255,done?248:255,done?231:255);
+    pdf.rect(cx,cy,cellW,cellH,"FD");
+    pdf.setTextColor(23,63,43);
+    pdf.setFont("helvetica","bold");
+    pdf.setFontSize(9);
+    const dt=new Date(date+"T12:00:00Z");
+    pdf.text(String(dt.getUTCDate()).padStart(2,"0")+" "+dt.toLocaleDateString("en-IN",{month:"short",timeZone:"UTC"}),cx+3,cy+7);
+    pdf.setFont("helvetica","normal");
+    pdf.setFontSize(7);
+    pdf.setTextColor(done?70:125,done?105:130,done?60:125);
+    pdf.text(done?"BOX BROUGHT":"NOT BROUGHT",cx+3,cy+14);
+    col++;
+    if(col>=6){col=0;row++;}
+  }
+
+  const footerY=y+headerH+(row+1)*cellH+10;
+  pdf.setFont("helvetica","normal");
+  pdf.setFontSize(8);
+  pdf.setTextColor(100,100,100);
+  pdf.text("Sunday is a holiday and is not included in the delivery calendar.",14,Math.min(footerY,275));
+  pdf.text("E2FIT · Gandhi Park, Coimbatore · Free delivery up to 5 km",14,Math.min(footerY+6,281));
+
+  const safeName=customer.replace(/[^a-z0-9]+/gi,"_").replace(/^_|_$/g,"")||"Subscriber";
+  pdf.save("E2FIT_"+safeName+"_"+month+".pdf");
 }
 
 async function toggleCalendarDelivery(input){

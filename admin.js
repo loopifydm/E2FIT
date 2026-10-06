@@ -39,7 +39,7 @@ document.getElementById("logout").addEventListener("click",async()=>{await supab
 
 function monthlyEndDate(startDate){let d=new Date(startDate+"T00:00:00"),count=0;while(count<26){if(d.getDay()!==0)count++;if(count<26)d.setDate(d.getDate()+1);}return d.toISOString().slice(0,10);}
 function weeklyEndDate(startDate){let d=new Date(startDate+"T00:00:00"),count=0;while(count<6){if(d.getDay()!==0)count++;if(count<6)d.setDate(d.getDate()+1);}return d.toISOString().slice(0,10);}
-async function refresh(){await generateToday();await loadOrders();await loadCustomers();await loadSubscriptions();}
+async function refresh(){await generateToday();await loadOrders();await loadCustomers();await loadSubscriptions();await loadMenu();}
 async function generateToday(){const {error}=await supabaseClient.rpc("e2fit_generate_today_deliveries");if(error)console.warn(error.message);}
 async function loadOrders(){
   const today=new Date().toISOString().slice(0,10);
@@ -52,6 +52,28 @@ async function loadCustomers(){
   if(error){console.error(error);return;}
   document.getElementById("customerRows").innerHTML=(data||[]).map(s=>{const c=s.e2fit_customers||{};return `<tr><td><strong>${escapeHtml(c.name||"—")}</strong><small>${escapeHtml(c.phone||"")}</small></td><td>${escapeHtml(s.box)}</td><td>${escapeHtml(s.plan)}</td><td>${escapeHtml(s.delivery_time)}</td><td><span class="pill Active">Active</span></td><td><button class="status-btn" onclick="deleteCustomer('${s.customer_id}')">Delete</button></td></tr>`;}).join("")||"<tr><td colspan='6'>No active subscriptions yet.</td></tr>";
 }
+async function loadMenu(){
+  const {data,error}=await supabaseClient.from("e2fit_weekly_menu").select("id,day_name,breakfast,lunch,sort_order").order("sort_order");
+  if(error){console.error(error);document.getElementById("menuRows").innerHTML="<tr><td colspan='3'>Could not load weekly menu.</td></tr>";return;}
+  document.getElementById("menuRows").innerHTML=(data||[]).map(row=>`<tr><td><strong>${escapeHtml(row.day_name)}</strong></td><td><input class="menu-input" data-id="${row.id}" data-field="breakfast" value="${escapeHtml(row.breakfast)}"></td><td><input class="menu-input" data-id="${row.id}" data-field="lunch" value="${escapeHtml(row.lunch)}"></td></tr>`).join("");
+}
+async function saveMenu(){
+  const button=document.getElementById("saveMenu");
+  const inputs=[...document.querySelectorAll(".menu-input")];
+  const grouped={};
+  inputs.forEach(input=>{grouped[input.dataset.id]??={id:input.dataset.id};grouped[input.dataset.id][input.dataset.field]=input.value.trim();});
+  button.disabled=true;button.textContent="Saving…";
+  try{
+    for(const row of Object.values(grouped)){
+      const {error}=await supabaseClient.from("e2fit_weekly_menu").update({breakfast:row.breakfast||"",lunch:row.lunch||"",updated_at:new Date().toISOString()}).eq("id",row.id);
+      if(error)throw error;
+    }
+    button.textContent="Saved ✓";
+    setTimeout(()=>{button.textContent="Save Menu";},1500);
+  }catch(error){console.error(error);alert("Could not save weekly menu: "+(error.message||"Unknown error"));button.textContent="Save Menu";}
+  finally{button.disabled=false;}
+}
+
 async function loadSubscriptions(){
   const {data,error}=await supabaseClient.from("e2fit_subscriptions").select("id,box,plan,delivery_time,status,start_date,end_date,e2fit_customers(name,phone)").order("created_at",{ascending:false});
   if(error){console.error(error);return;}
@@ -73,7 +95,7 @@ document.getElementById("filter").addEventListener("change",render);
 const modal=document.getElementById("orderModal");
 document.getElementById("newOrder").addEventListener("click",()=>modal.classList.remove("hidden"));
 document.getElementById("closeModal").addEventListener("click",()=>modal.classList.add("hidden"));
-document.getElementById("saveOrder").addEventListener("click",saveOrder);
+document.getElementById("saveOrder").addEventListener("click",saveOrder);\ndocument.getElementById("saveMenu").addEventListener("click",saveMenu);
 async function saveOrder(){
   const fields={name:document.getElementById("name"),phone:document.getElementById("phone"),box:document.getElementById("box"),plan:document.getElementById("plan"),delivery:document.getElementById("delivery"),address:document.getElementById("address")};
   const button=document.getElementById("saveOrder");

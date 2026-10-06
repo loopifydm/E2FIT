@@ -91,7 +91,7 @@ async function renderSubscriberCalendar(){
   if(start>end){box.innerHTML='<div class="calendar-empty">No delivery days for this month.</div>';return;}
   const {data,error}=await supabaseClient.from("e2fit_deliveries").select("id,delivery_date,status").eq("subscription_id",sub.id).gte("delivery_date",start).lte("delivery_date",end);
   if(error){console.error(error);box.innerHTML='<div class="calendar-empty">Could not load delivery calendar.</div>';return;}
-  const byDate={};(data||[]).forEach(d=>byDate[d.delivery_date]=d);
+  const byDate={};(data||[]).forEach(d=>{if(new Date(d.delivery_date+"T00:00:00").getDay()!==0)byDate[d.delivery_date]=d;});
   const dates=[];let d=new Date(start+"T00:00:00"),last=new Date(end+"T00:00:00");
   while(d<=last){if(d.getDay()!==0)dates.push(d.toISOString().slice(0,10));d.setDate(d.getDate()+1);}
   const firstDay=new Date(dates[0]+"T00:00:00").getDay();

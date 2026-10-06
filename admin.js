@@ -153,25 +153,34 @@ async function syncSubscriberFromInvoice(invoiceId,invoiceData){
 }
 
 async function generateInvoice(){
-  const name=document.getElementById("invoiceCustomer").value.trim(),phone=document.getElementById("invoicePhone").value.trim(),address=document.getElementById("invoiceAddress").value.trim(),box=document.getElementById("invoiceBox").value,plan=document.getElementById("invoicePlan").value,startDate=document.getElementById("invoiceStartDate").value,endDate=document.getElementById("invoiceEndDate").value,amount=Number(document.getElementById("invoiceAmount").value||0),advance=Number(document.getElementById("invoicePaid")?.checked?amount:document.getElementById("invoiceAdvance").value||0),balance=Math.max(0,amount-advance),date=document.getElementById("invoiceDate").value||new Date().toISOString().slice(0,10);
+  const name=document.getElementById("invoiceCustomer").value.trim(),phone=document.getElementById("invoicePhone").value.trim(),address=document.getElementById("invoiceAddress").value.trim(),box=document.getElementById("invoiceBox").value,plan=document.getElementById("invoicePlan").value,startDate=document.getElementById("invoiceStartDate").value,endDate=document.getElementById("invoiceEndDate").value,deliveryTime=document.getElementById("invoiceDeliveryTime").value||"Breakfast",amount=Number(document.getElementById("invoiceAmount").value||0),advance=Number(document.getElementById("invoicePaid")?.checked?amount:document.getElementById("invoiceAdvance").value||0),balance=Math.max(0,amount-advance),date=document.getElementById("invoiceDate").value||new Date().toISOString().slice(0,10);
   if(!name){alert("Enter the customer name.");return;}
+  if(!startDate||!endDate){alert("Select the plan start and end dates.");return;}
   const planKey=invoicePlanKey();
+  const invoiceData={customer_name:name,phone,address,box,plan:planKey,delivery_time:deliveryTime,amount,start_date:startDate,end_date:endDate};
   let result,invoiceNo;
   if(editingInvoiceId){
     invoiceNo=editingInvoiceNumber;
-    const payload={customer_name:name,phone,address,box,plan:planKey,delivery_time:deliveryTime,amount,advance_amount:advance,balance_amount:balance,invoice_date:date,start_date:startDate,end_date:endDate,updated_at:new Date().toISOString()};\n    if(!result.error){try{await syncSubscriberFromInvoice(editingInvoiceId,{customer_name:name,phone,address,box,plan:planKey,delivery_time:deliveryTime,amount,start_date:startDate,end_date:endDate});}catch(error){alert("Invoice updated, but subscriber sync failed: "+(error.message||"Unknown error"));}}
+    const payload={customer_name:name,phone,address,box,plan:planKey,delivery_time:deliveryTime,amount,advance_amount:advance,balance_amount:balance,invoice_date:date,start_date:startDate,end_date:endDate,updated_at:new Date().toISOString()};
     result=await supabaseClient.from("e2fit_invoices").update(payload).eq("id",editingInvoiceId);
-    if(!result.error){await renderInvoice(invoiceNo);await loadInvoices();}
     if(result.error){alert("Could not update invoice: "+result.error.message);return;}
+    try{await syncSubscriberFromInvoice(editingInvoiceId,invoiceData);}catch(error){alert("Invoice updated, but subscriber sync failed: "+(error.message||"Unknown error"));return;}
+    await renderInvoice(invoiceNo);await loadInvoices();
     editingInvoiceId=null;editingInvoiceNumber=null;
     document.getElementById("generateInvoice").textContent="Generate Invoice";
     return;
   }
   try{invoiceNo=await invoiceNumber();}catch(error){alert("Could not generate invoice number: "+error.message);return;}
   const payload={invoice_number:invoiceNo,customer_name:name,phone,address,box,plan:planKey,delivery_time:deliveryTime,amount,advance_amount:advance,balance_amount:balance,invoice_date:date,start_date:startDate,end_date:endDate,updated_at:new Date().toISOString()};
-  try{await syncSubscriberFromInvoice(result.data.id,{customer_name:name,phone,address,box,plan:planKey,delivery_time:deliveryTime,amount,start_date:startDate,end_date:endDate});}catch(error){await supabaseClient.from("e2fit_invoices").delete().eq("id",result.data.id);alert("Invoice was not created because the subscriber could not be saved: "+(error.message||"Unknown error"));return;}
   result=await supabaseClient.from("e2fit_invoices").insert(payload).select("id").single();
   if(result.error){alert("Could not save invoice: "+result.error.message);return;}
+  try{
+    await syncSubscriberFromInvoice(result.data.id,invoiceData);
+  }catch(error){
+    await supabaseClient.from("e2fit_invoices").delete().eq("id",result.data.id);
+    alert("Invoice was not created because the subscriber could not be saved: "+(error.message||"Unknown error"));
+    return;
+  }
   await renderInvoice(invoiceNo);
   await loadInvoices();
   editingInvoiceId=null;editingInvoiceNumber=null;

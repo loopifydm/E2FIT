@@ -70,26 +70,6 @@ async function advance(id,next){const {error}=await supabaseClient.from("e2fit_d
 async function deleteCustomer(id){if(!id||!confirm("Delete this customer and all their subscriptions and deliveries?"))return;const {error}=await supabaseClient.from("e2fit_customers").delete().eq("id",id);if(error){alert("Could not delete customer: "+error.message);return;}await refresh();}
 
 document.getElementById("filter").addEventListener("change",render);
-const modal=document.getElementById("orderModal");
-document.getElementById("newOrder").addEventListener("click",()=>modal.classList.remove("hidden"));
-document.getElementById("closeModal").addEventListener("click",()=>modal.classList.add("hidden"));
-document.getElementById("saveOrder").addEventListener("click",saveOrder);
-async function saveOrder(){
-  const fields={name:document.getElementById("name"),phone:document.getElementById("phone"),box:document.getElementById("box"),plan:document.getElementById("plan"),delivery:document.getElementById("delivery"),address:document.getElementById("address")};
-  const button=document.getElementById("saveOrder");
-  const name=fields.name.value.trim(),phone=fields.phone.value.trim(),box=fields.box.value,planLabel=fields.plan.value,plan=planLabel.startsWith("Weekly")?"Weekly":planLabel.startsWith("Monthly")?"Monthly":"Daily",delivery=fields.delivery.value,address=fields.address.value.trim();
-  if(!name||!phone||!address){alert("Name, phone and address are required.");return;}
-  button.disabled=true;button.textContent="Saving…";
-  try{
-    const prices={"Mixed Box":[60,1499],"Medium Box":[80,1999],"Premium Box":[100,2499],"Premium Pro Box":[120,2999]},today=new Date().toISOString().slice(0,10);
-    const {data:customer,error:e1}=await supabaseClient.from("e2fit_customers").insert({name,phone,address}).select("id").single();if(e1)throw e1;
-    const end=plan==="Monthly"?monthlyEndDate(today):plan==="Weekly"?weeklyEndDate(today):today;
-    const {data:subscription,error:e2}=await supabaseClient.from("e2fit_subscriptions").insert({customer_id:customer.id,box,plan,daily_price:prices[box][0],monthly_price:prices[box][1],start_date:today,end_date:end,delivery_time:delivery}).select("id").single();if(e2)throw e2;
-    const {error:e3}=await supabaseClient.from("e2fit_deliveries").insert({customer_id:customer.id,subscription_id:subscription.id,delivery_date:today,delivery_time:delivery,box,address});if(e3)throw e3;
-    modal.classList.add("hidden");fields.name.value="";fields.phone.value="";fields.address.value="";await refresh();
-  }catch(error){console.error(error);alert("Could not save order: "+(error.message||"Unknown error"));}finally{button.disabled=false;button.textContent="Save Order";}
-}
-
 const invoicePrices={"Mixed Box":{Daily:60,Weekly:360,Monthly:1499},"Medium Box":{Daily:80,Weekly:480,Monthly:1999},"Premium Box":{Daily:100,Weekly:600,Monthly:2499},"Premium Pro Box":{Daily:120,Weekly:720,Monthly:2999}};
 async function loadInvoices(){
   const {data,error}=await supabaseClient.from("e2fit_invoices").select("*").order("created_at",{ascending:false});

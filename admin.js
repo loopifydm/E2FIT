@@ -39,7 +39,7 @@ document.getElementById("logout").addEventListener("click",async()=>{await supab
 
 function monthlyEndDate(startDate){let d=new Date(startDate+"T00:00:00"),count=0;while(count<26){if(d.getDay()!==0)count++;if(count<26)d.setDate(d.getDate()+1);}return d.toISOString().slice(0,10);}
 function weeklyEndDate(startDate){let d=new Date(startDate+"T00:00:00"),count=0;while(count<6){if(d.getDay()!==0)count++;if(count<6)d.setDate(d.getDate()+1);}return d.toISOString().slice(0,10);}
-async function refresh(){await generateToday();await loadEnquiries();await loadOrders();await loadCustomers();await loadSubscriptions();await loadSubscriberCalendarOptions();await loadInvoices();}
+async function refresh(){await generateToday();await loadEnquiries();await loadOrders();await loadCustomers();await loadSubscriptions();await loadInvoices();}
 async function loadEnquiries(){
   const {data,error}=await supabaseClient.from("e2fit_enquiries").select("*").order("created_at",{ascending:false});
   if(error){console.error(error);return;}

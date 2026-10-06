@@ -134,7 +134,7 @@ async function renderSubscriberCalendar(){
   const spacers=Array.from({length:leadingBlanks},()=>'<div class="calendar-spacer"></div>').join("");
   const days=dates.map(date=>{
     const rec=byDate[date],done=rec?.status==="Delivered",dt=new Date(date+"T12:00:00Z"),label=dt.toLocaleDateString("en-IN",{weekday:"short",day:"2-digit",month:"short"});
-    return '<label class="calendar-day '+(done?"done":"")+'"><input type="checkbox" '+(done?"checked":"")+' data-delivery-id="'+(rec?.id||"")+'" data-subscription-id="'+sub.id+'" data-date="'+date+'"><span class="day-check">'+(done?"✓":"")+'</span><span class="day-info"><strong>'+label+'</strong><small>'+(done?"Box brought":"Not brought")+'</small></span></label>';
+    return '<label class="calendar-day '+(done?"done":"")+'"><input type="checkbox" '+(done?"checked":"")+' data-delivery-id="'+(rec?.id||"")+'" data-subscription-id="'+sub.id+'" data-date="'+date+'"><span class="day-check">'+(done?"✓":"")+'</span><span class="day-info"><strong>'+label+'</strong><small>'+(done?"Box delivered":"Not delivered")+'</small></span></label>';
   }).join("");
 
   const statusText=remaining>0?("Brought: "+deliveredCount+" / "+targetDays+" · Remaining: "+remaining):("Completed: "+targetDays+" / "+targetDays);
@@ -226,7 +226,7 @@ async function downloadSubscriberCalendarPDF(){
     pdf.setFont("helvetica","normal");
     pdf.setFontSize(7);
     pdf.setTextColor(done?70:125,done?105:130,done?60:125);
-    pdf.text(done?"BOX BROUGHT":"NOT BROUGHT",cx+3,cy+14);
+    pdf.text(done?"BOX DELIVERED":"NOT DELIVERED",cx+3,cy+14);
     col++;
     if(col>=6){col=0;row++;}
   }

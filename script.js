@@ -41,7 +41,7 @@ document.getElementById("whatsappOrder").addEventListener("click",async()=>{
     });
     if(deliveryError)throw deliveryError;
     const message="Hi E2FIT!\n\nI'd like to order:\n• Box: "+selectedBox+"\n• Price: "+selectedPrice+"\n• Plan: "+plan+"\n• Delivery: "+time+"\n• Name: "+name+"\n• Phone: "+phone+"\n• Address: "+address+"\n\nMy order has been submitted through the E2FIT website. Please confirm the next steps.";
-    window.open("https://wa.me/?text="+encodeURIComponent(message),"_blank");
+    window.open("https://wa.me/917904894446?text="+encodeURIComponent(message),"_blank");
     modal.classList.remove("open");alert("Order submitted successfully. We’ll continue on WhatsApp.");
     document.getElementById("customerName").value="";document.getElementById("customerPhone").value="";document.getElementById("customerAddress").value="";
   }catch(error){console.error(error);alert("We couldn't save the order. Please try again or contact E2FIT on WhatsApp.");}

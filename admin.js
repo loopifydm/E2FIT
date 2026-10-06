@@ -39,7 +39,7 @@ document.getElementById("logout").addEventListener("click",async()=>{await supab
 
 function monthlyEndDate(startDate){let d=new Date(startDate+"T00:00:00"),count=0;while(count<26){if(d.getDay()!==0)count++;if(count<26)d.setDate(d.getDate()+1);}return d.toISOString().slice(0,10);}
 function weeklyEndDate(startDate){let d=new Date(startDate+"T00:00:00"),count=0;while(count<6){if(d.getDay()!==0)count++;if(count<6)d.setDate(d.getDate()+1);}return d.toISOString().slice(0,10);}
-async function refresh(){await generateToday();await loadOrders();await loadCustomers();await loadSubscriptions();}
+async function refresh(){await generateToday();await loadOrders();await loadCustomers();await loadSubscriptions();await loadInvoices();}
 async function generateToday(){const {error}=await supabaseClient.rpc("e2fit_generate_today_deliveries");if(error)console.warn(error.message);}
 async function loadOrders(){
   const today=new Date().toISOString().slice(0,10);
@@ -91,14 +91,43 @@ async function saveOrder(){
 }
 
 const invoicePrices={"Mixed Box":{Daily:60,Weekly:360,Monthly:1499},"Medium Box":{Daily:80,Weekly:480,Monthly:1999},"Premium Box":{Daily:100,Weekly:600,Monthly:2499},"Premium Pro Box":{Daily:120,Weekly:720,Monthly:2999}};
+async function loadInvoices(){
+  const {data,error}=await supabaseClient.from("e2fit_invoices").select("*").order("created_at",{ascending:false});
+  if(error){console.error(error);return;}
+  document.getElementById("invoiceRows").innerHTML=(data||[]).map(i=>`<tr><td><strong>${escapeHtml(i.invoice_number)}</strong></td><td>${escapeHtml(i.customer_name)}<small>${escapeHtml(i.phone||"")}</small></td><td>${escapeHtml(i.box)} · ${escapeHtml(i.plan)}</td><td>₹${Number(i.amount||0).toLocaleString("en-IN")}</td><td>${escapeHtml(i.invoice_date)}</td><td><button class="status-btn" onclick="editInvoice('${i.id}')">Edit</button> <button class="status-btn" onclick="printSavedInvoice('${i.id}')">Print</button> <button class="status-btn" onclick="deleteInvoice('${i.id}')">Delete</button></td></tr>`).join("")||"<tr><td colspan='6'>No invoices generated yet.</td></tr>";
+}
+let editingInvoiceId=null,editingInvoiceNumber=null;
+async function editInvoice(id){
+  const {data,error}=await supabaseClient.from("e2fit_invoices").select("*").eq("id",id).single();if(error){alert(error.message);return;}
+  editingInvoiceId=id;editingInvoiceNumber=data.invoice_number;
+  document.getElementById("invoiceCustomer").value=data.customer_name||"";document.getElementById("invoicePhone").value=data.phone||"";document.getElementById("invoiceAddress").value=data.address||"";document.getElementById("invoiceBox").value=data.box||"Mixed Box";document.getElementById("invoicePlan").value=data.plan==="Weekly"?"Weekly (6 days)":data.plan==="Monthly"?"Monthly (26 days)":"Daily";document.getElementById("invoiceAmount").value=data.amount;document.getElementById("invoiceDate").value=data.invoice_date;updateInvoiceAmount();
+  document.getElementById("invoices").scrollIntoView({behavior:"smooth"});await renderInvoice(data.invoice_number);
+}
+async function renderInvoice(invoiceNoOverride){
+  const name=document.getElementById("invoiceCustomer").value.trim(),phone=document.getElementById("invoicePhone").value.trim(),address=document.getElementById("invoiceAddress").value.trim(),box=document.getElementById("invoiceBox").value,plan=document.getElementById("invoicePlan").value,amount=Number(document.getElementById("invoiceAmount").value||0),date=document.getElementById("invoiceDate").value||new Date().toISOString().slice(0,10);
+  if(!name)return;
+  const planKey=invoicePlanKey(),invoiceNo=invoiceNoOverride||await invoiceNumber();
+  document.getElementById("invoicePreview").innerHTML=`<div class="invoice-paper"><div class="invoice-brand"><div><img class="invoice-logo-img" src="https://loopifydm.github.io/E2FIT/assets/e2fit-logo.jpg" alt="E2FIT"><small>Fresh. Healthy. Better Every Day.</small></div><div class="invoice-meta"><strong>INVOICE</strong><span>${escapeHtml(invoiceNo)}</span><span>${escapeHtml(date)}</span></div></div><div class="invoice-customer"><div><small>BILL TO</small><strong>${escapeHtml(name)}</strong><span>${escapeHtml(phone)}</span><span>${escapeHtml(address)}</span></div></div><table class="invoice-table"><thead><tr><th>Description</th><th>Plan</th><th class="amount">Amount</th></tr></thead><tbody><tr><td>${escapeHtml(box)}</td><td>${escapeHtml(planKey)}</td><td class="amount">₹${amount.toLocaleString("en-IN")}</td></tr></tbody></table><div class="invoice-total"><span>Total</span><strong>₹${amount.toLocaleString("en-IN")}</strong></div><div class="invoice-footer">Thank you for choosing E2FIT.<br>Gandhi Park, Coimbatore · Free delivery up to 5 km</div></div>`;
+}
+async function deleteInvoice(id){if(!confirm("Delete this invoice? This cannot be undone."))return;const {error}=await supabaseClient.from("e2fit_invoices").delete().eq("id",id);if(error){alert("Could not delete invoice: "+error.message);return;}if(editingInvoiceId===id){editingInvoiceId=null;editingInvoiceNumber=null;}await loadInvoices();}
+async function printSavedInvoice(id){await editInvoice(id);setTimeout(()=>printInvoice(),200);}
+
 function invoicePlanKey(){const v=document.getElementById("invoicePlan").value;return v.startsWith("Weekly")?"Weekly":v.startsWith("Monthly")?"Monthly":"Daily";}
 function updateInvoiceAmount(){const box=document.getElementById("invoiceBox").value;document.getElementById("invoiceAmount").value=invoicePrices[box][invoicePlanKey()];}
 async function invoiceNumber(){const {data,error}=await supabaseClient.rpc("e2fit_next_invoice_number");if(error)throw error;return data;}
 async function generateInvoice(){
   const name=document.getElementById("invoiceCustomer").value.trim(),phone=document.getElementById("invoicePhone").value.trim(),address=document.getElementById("invoiceAddress").value.trim(),box=document.getElementById("invoiceBox").value,plan=document.getElementById("invoicePlan").value,amount=Number(document.getElementById("invoiceAmount").value||0),date=document.getElementById("invoiceDate").value||new Date().toISOString().slice(0,10);
   if(!name){alert("Enter the customer name.");return;}
-  const planKey=invoicePlanKey();let invoiceNo;try{invoiceNo=await invoiceNumber();}catch(error){console.error(error);alert("Could not generate invoice number: "+error.message);return;}
-  document.getElementById("invoicePreview").innerHTML=`<div class="invoice-paper"><div class="invoice-brand"><div><img class="invoice-logo-img" src="https://loopifydm.github.io/E2FIT/assets/e2fit-logo.jpg" alt="E2FIT"><small>Fresh. Healthy. Better Every Day.</small></div><div class="invoice-meta"><strong>INVOICE</strong><span>${escapeHtml(invoiceNo)}</span><span>${escapeHtml(date)}</span></div></div><div class="invoice-customer"><div><small>BILL TO</small><strong>${escapeHtml(name)}</strong><span>${escapeHtml(phone)}</span><span>${escapeHtml(address)}</span></div></div><table class="invoice-table"><thead><tr><th>Description</th><th>Plan</th><th class="amount">Amount</th></tr></thead><tbody><tr><td>${escapeHtml(box)}</td><td>${escapeHtml(planKey)}</td><td class="amount">₹${amount.toLocaleString("en-IN")}</td></tr></tbody></table><div class="invoice-total"><span>Total</span><strong>₹${amount.toLocaleString("en-IN")}</strong></div><div class="invoice-footer">Thank you for choosing E2FIT.<br>Gandhi Park, Coimbatore · Free delivery up to 5 km</div></div>`;
+  const planKey=invoicePlanKey();let invoiceNo=editingInvoiceNumber;
+  if(!invoiceNo){try{invoiceNo=await invoiceNumber();}catch(error){alert("Could not generate invoice number: "+error.message);return;}}
+  const payload={customer_name:name,phone,address,box,plan:planKey,amount,invoice_date:date,updated_at:new Date().toISOString()};
+  let result;
+  if(editingInvoiceId) result=await supabaseClient.from("e2fit_invoices").update(payload).eq("id",editingInvoiceId);
+  else result=await supabaseClient.from("e2fit_invoices").insert({...payload,invoice_number:invoiceNo}).select("id").single();
+  if(result.error){alert("Could not save invoice: "+result.error.message);return;}
+  if(!editingInvoiceId&&result.data)editingInvoiceId=result.data.id;
+  editingInvoiceNumber=invoiceNo;
+  await renderInvoice(invoiceNo);await loadInvoices();
 }
 function printInvoice(){
   const paper=document.querySelector(".invoice-paper");if(!paper){alert("Generate an invoice first.");return;}

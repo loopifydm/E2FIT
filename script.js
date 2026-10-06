@@ -28,7 +28,7 @@ document.getElementById("whatsappOrder").addEventListener("click",async()=>{
     return;
   }
 
-  const normalizedPlan=plan.startsWith("Monthly")?"Monthly":"Daily";
+  const normalizedPlan=plan.startsWith("Monthly")?"Monthly":plan.startsWith("Weekly")?"Weekly":"Daily";
   button.disabled=true;
   button.textContent="Saving order…";
 
@@ -45,7 +45,7 @@ document.getElementById("whatsappOrder").addEventListener("click",async()=>{
     if(error) throw error;
     if(!data||!data.length) throw new Error("The order was not created.");
 
-    const message="Hi E2FIT!\n\nI'd like to order:\n• Box: "+selectedBox+"\n• Price: "+selectedPrice+"\n• Plan: "+plan+"\n• Delivery: "+time+"\n• Name: "+name+"\n• Phone: "+phone+"\n• Address: "+address+"\n\nMy order has been submitted through the E2FIT website. Please confirm the next steps.";
+    const message="Hi E2FIT!\n\nI'd like to order:\n• Box: "+selectedBox+"\n• Price: "+(plan.startsWith("Weekly")?"₹"+({"Mixed Box":360,"Medium Box":480,"Premium Box":600,"Premium Pro Box":720}[selectedBox])+"/week":selectedPrice)+"\n• Plan: "+plan\n• Delivery: "+time+"\n• Name: "+name+"\n• Phone: "+phone+"\n• Address: "+address+"\n\nMy order has been submitted through the E2FIT website. Please confirm the next steps.";
     const whatsappUrl="https://wa.me/"+E2FIT_WHATSAPP+"?text="+encodeURIComponent(message);
 
     modal.classList.remove("open");

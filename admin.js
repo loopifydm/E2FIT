@@ -139,6 +139,16 @@ async function generateInvoice(){
   editingInvoiceId=null;editingInvoiceNumber=null;
   document.getElementById("generateInvoice").textContent="Generate Invoice";
 }
+function resetInvoiceGenerator(){
+  ["invoiceCustomer","invoicePhone","invoiceAddress","invoiceAmount","invoiceAdvance","invoiceBalance"].forEach(id=>{const el=document.getElementById(id);if(el)el.value=id==="invoiceAmount"||id==="invoiceAdvance"||id==="invoiceBalance"?"0":"";});
+  const paid=document.getElementById("invoicePaid");if(paid)paid.checked=false;
+  const date=document.getElementById("invoiceDate");if(date)date.value=new Date().toISOString().slice(0,10);
+  const box=document.getElementById("invoiceBox");if(box)box.selectedIndex=0;
+  const plan=document.getElementById("invoicePlan");if(plan)plan.selectedIndex=0;
+  editingInvoiceId=null;editingInvoiceNumber=null;
+  const btn=document.getElementById("generateInvoice");if(btn)btn.textContent="Generate Invoice";
+  const preview=document.getElementById("invoicePreview");if(preview)preview.innerHTML='<div class="invoice-placeholder">Enter customer details and click <strong>Generate Invoice</strong>.</div>';
+}
 function printInvoice(){
   const paper=document.querySelector(".invoice-paper");if(!paper){alert("Generate an invoice first.");return;}
   const w=window.open("","_blank");w.document.write(`<!doctype html><html><head><title>E2FIT Invoice</title><style>body{font-family:Arial,sans-serif;padding:35px;color:#173f2b}.invoice-paper{max-width:760px;margin:auto;border:1px solid #ddd;padding:40px}.invoice-brand{display:flex;justify-content:space-between;border-bottom:1px solid #ddd;padding-bottom:25px}.invoice-logo-img{width:110px;height:70px;object-fit:contain;display:block;margin-bottom:5px}.invoice-meta{text-align:right}.invoice-meta span,.invoice-meta strong{display:block}.invoice-customer{padding:30px 0}.invoice-customer small,.invoice-customer strong,.invoice-customer span{display:block;margin:4px 0}.invoice-table{width:100%;border-collapse:collapse}.invoice-table th,.invoice-table td{text-align:left;padding:14px 8px;border-bottom:1px solid #ddd}.amount{text-align:right!important}.invoice-total{display:flex;justify-content:flex-end;gap:80px;padding:22px 8px;font-size:18px}.invoice-footer{text-align:center;border-top:1px solid #ddd;padding-top:25px;color:#666;font-size:12px}</style></head><body>${paper.outerHTML}</body></html>`);w.document.close();w.focus();setTimeout(()=>w.print(),300);

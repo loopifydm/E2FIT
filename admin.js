@@ -210,37 +210,91 @@ function updateInvoicePlanDates(){const start=document.getElementById("invoiceSt
 function updateInvoiceAmount(){const box=document.getElementById("invoiceBox").value,plan=invoicePlanKey(),amount=document.getElementById("invoiceAmount");if(plan!=="Trial"){amount.value=invoicePrices[box][plan];}else if(amount.value===""){amount.value="0";}updateInvoiceBalance();}document.getElementById("invoicePaid")?.addEventListener("change",()=>updateInvoiceBalance());function updateInvoiceBalance(){const total=Number(document.getElementById("invoiceAmount").value||0),paid=document.getElementById("invoicePaid")?.checked||false,advance=paid?total:Number(document.getElementById("invoiceAdvance").value||0);document.getElementById("invoiceAdvance").value=advance;document.getElementById("invoiceBalance").value=Math.max(0,total-advance);}
 async function invoiceNumber(){const {data,error}=await supabaseClient.rpc("e2fit_next_invoice_number");if(error)throw error;return data;}
 async function syncSubscriberFromInvoice(invoiceId,invoiceData){
-  let customerId=null;
-  const phone=(invoiceData.phone||"").trim();
-  if(phone){
-    const {data,error}=await supabaseClient.from("e2fit_customers").select("id").eq("phone",phone).maybeSingle();
-    if(error)throw error;
-    customerId=data?.id||null;
-  }
-  if(!customerId){
-    const {data,error}=await supabaseClient.from("e2fit_customers").insert({name:invoiceData.customer_name,phone:invoiceData.phone||"",address:invoiceData.address||""}).select("id").single();
-    if(error)throw error;
-    customerId=data.id;
-  }else{
-    const {error}=await supabaseClient.from("e2fit_customers").update({name:invoiceData.customer_name,address:invoiceData.address||""}).eq("id",customerId);
-    if(error)throw error;
-  }
-  const prices=invoicePrices[invoiceData.box];
-  const subscriptionPayload={customer_id:customerId,invoice_id:invoiceId,box:invoiceData.box,plan:invoiceData.plan,daily_price:invoiceData.plan==="Trial"?invoiceData.amount:prices.Daily,monthly_price:invoiceData.amount,start_date:invoiceData.start_date,end_date:invoiceData.end_date,delivery_time:invoiceData.delivery_time,status:"active",updated_at:new Date().toISOString()};
-  const {data:existing,error:findError}=await supabaseClient.from("e2fit_subscriptions").select("id").eq("invoice_id",invoiceId).maybeSingle();
+  // When an invoice is edited, keep the existing invoice-linked customer and
+  // subscription as the source record. This prevents duplicate subscribers
+  // when the phone number is changed during an edit.
+  const {data:existing,error:findError}=await supabaseClient.from("e2fit_subscriptions").select("id,customer_id,plan,start_date,end_date").eq("invoice_id",invoiceId).maybeSingle();
   if(findError)throw findError;
+
+  let customerId=existing?.customer_id||null;
+  if(customerId){
+    const {error}=await supabaseClient.from("e2fit_customers").update({
+      name:invoiceData.customer_name,
+      phone:(invoiceData.phone||"").trim(),
+      address:invoiceData.address||""
+    }).eq("id",customerId);
+    if(error)throw error;
+  }else{
+    const phone=(invoiceData.phone||"").trim();
+    if(phone){
+      const {data:byPhone,error}=await supabaseClient.from("e2fit_customers").select("id").eq("phone",phone).maybeSingle();
+      if(error)throw error;
+      customerId=byPhone?.id||null;
+    }
+    if(!customerId){
+      const {data:customer,error}=await supabaseClient.from("e2fit_customers").insert({
+        name:invoiceData.customer_name,
+        phone:invoiceData.phone||"",
+        address:invoiceData.address||""
+      }).select("id").single();
+      if(error)throw error;
+      customerId=customer.id;
+    }else{
+      const {error}=await supabaseClient.from("e2fit_customers").update({
+        name:invoiceData.customer_name,
+        address:invoiceData.address||""
+      }).eq("id",customerId);
+      if(error)throw error;
+    }
+  }
+
+  const prices=invoicePrices[invoiceData.box];
+  if(!prices && invoiceData.plan!=="Trial")throw new Error("Invalid box selected.");
+
+  // Preserve a previously extended Weekly/Monthly subscription when the
+  // invoice is edited without changing its plan start date.
+  let syncedEndDate=invoiceData.end_date;
+  if(existing && existing.plan===invoiceData.plan && existing.start_date===invoiceData.start_date && invoiceData.plan!=="Trial"){
+    syncedEndDate=existing.end_date>invoiceData.end_date?existing.end_date:invoiceData.end_date;
+  }
+
+  const subscriptionPayload={
+    customer_id:customerId,
+    invoice_id:invoiceId,
+    box:invoiceData.box,
+    plan:invoiceData.plan,
+    daily_price:invoiceData.plan==="Trial"?invoiceData.amount:prices.Daily,
+    monthly_price:invoiceData.amount,
+    start_date:invoiceData.start_date,
+    end_date:syncedEndDate,
+    delivery_time:invoiceData.delivery_time,
+    status:"active",
+    updated_at:new Date().toISOString()
+  };
+
   let subscriptionId=existing?.id;
   if(subscriptionId){
     const {error}=await supabaseClient.from("e2fit_subscriptions").update(subscriptionPayload).eq("id",subscriptionId);
     if(error)throw error;
-    const {error:deliveryError}=await supabaseClient.from("e2fit_deliveries").update({delivery_time:invoiceData.delivery_time,box:invoiceData.box,address:invoiceData.address||"",updated_at:new Date().toISOString()}).eq("subscription_id",subscriptionId).in("status",["Pending","Preparing","Out for Delivery"]);
+
+    // Update every linked delivery, including already-delivered rows, so an
+    // invoice edit is reflected consistently in the delivery list and calendar.
+    const {error:deliveryError}=await supabaseClient.from("e2fit_deliveries").update({
+      customer_id:customerId,
+      delivery_time:invoiceData.delivery_time,
+      box:invoiceData.box,
+      address:invoiceData.address||"",
+      updated_at:new Date().toISOString()
+    }).eq("subscription_id",subscriptionId);
     if(deliveryError)throw deliveryError;
   }else{
     const {data:subscription,error}=await supabaseClient.from("e2fit_subscriptions").insert(subscriptionPayload).select("id").single();
     if(error)throw error;
     subscriptionId=subscription.id;
   }
-  await supabaseClient.rpc("e2fit_generate_today_deliveries");
+
+  const {error:generateError}=await supabaseClient.rpc("e2fit_generate_today_deliveries");
+  if(generateError)console.warn("Could not regenerate today's delivery:",generateError.message);
   return {customerId,subscriptionId};
 }
 
@@ -257,7 +311,7 @@ async function generateInvoice(){
     result=await supabaseClient.from("e2fit_invoices").update(payload).eq("id",editingInvoiceId);
     if(result.error){alert("Could not update invoice: "+result.error.message);return;}
     try{await syncSubscriberFromInvoice(editingInvoiceId,invoiceData);}catch(error){alert("Invoice updated, but subscriber sync failed: "+(error.message||"Unknown error"));return;}
-    await renderInvoice(invoiceNo);await loadInvoices();
+    await renderInvoice(invoiceNo);await loadInvoices();await loadOrders();await loadCustomers();await loadSubscriptions();await loadSubscriberCalendarOptions();
     editingInvoiceId=null;editingInvoiceNumber=null;
     document.getElementById("generateInvoice").textContent="Generate Invoice";
     return;

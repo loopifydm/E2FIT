@@ -14,10 +14,10 @@ async function boot(){
 function showLogin(message=""){login.classList.remove("hidden");app.classList.add("hidden");if(message)document.getElementById("loginError").textContent=message;}
 function showApp(){login.classList.add("hidden");app.classList.remove("hidden");}
 document.getElementById("loginBtn").onclick=async()=>{
-  const email=document.getElementById("adminEmail").value.trim(),password=document.getElementById("adminPass").value,errorBox=document.getElementById("loginError");
-  errorBox.textContent="";if(!email||!password){errorBox.textContent="Enter your admin email and password.";return;}
+  const username=document.getElementById("adminEmail").value.trim(),password=document.getElementById("adminPass").value,errorBox=document.getElementById("loginError");
+  errorBox.textContent="";if(!username||!password){errorBox.textContent="Enter your username and password.";return;}
   const button=document.getElementById("loginBtn");button.disabled=true;button.textContent="Signing in…";
-  const {error}=await supabaseClient.auth.signInWithPassword({email,password});
+  const {error}=await supabaseClient.auth.signInWithPassword({email:username==="admin"?"loopifydm@gmail.com":username,password});
   button.disabled=false;button.textContent="Sign in →";
   if(error){errorBox.textContent=error.message;return;}
   if(!(await isAdmin())){await supabaseClient.auth.signOut();errorBox.textContent="Signed in, but this account is not an E2FIT admin.";return;}

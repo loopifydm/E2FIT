@@ -89,6 +89,6 @@ async function saveOrder(){
     modal.classList.add("hidden");fields.name.value="";fields.phone.value="";fields.address.value="";await refresh();
   }catch(error){console.error(error);alert("Could not save order: "+(error.message||"Unknown error"));}finally{button.disabled=false;button.textContent="Save Order";}
 }
-function escapeHtml(value){return String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",""":"&quot;","'":"&#039;"}[c]));}
+function escapeHtml(value){return String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]));}
 document.querySelectorAll("aside nav a").forEach(a=>a.addEventListener("click",e=>{e.preventDefault();const target=document.querySelector(a.getAttribute("href"));if(target){document.querySelectorAll("aside nav a").forEach(x=>x.classList.remove("active"));a.classList.add("active");target.scrollIntoView({behavior:"smooth",block:"start"});}}));
 boot();

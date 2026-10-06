@@ -66,7 +66,7 @@ async function loadSubscriptions(){
   document.getElementById("subscriptionRows").innerHTML=(data||[]).map(s=>{const c=s.e2fit_customers||{};return "<tr><td><strong>"+escapeHtml(c.name||"—")+"</strong><small>"+escapeHtml(c.phone||"")+"</small></td><td>"+escapeHtml(s.box)+"</td><td>"+escapeHtml(s.plan)+"</td><td>"+escapeHtml(s.delivery_time)+"</td><td>"+escapeHtml(s.start_date)+"</td><td>"+escapeHtml(s.end_date)+"</td><td><span class='pill "+escapeHtml(s.status)+"'>"+escapeHtml(s.status)+"</span></td></tr>";}).join("")||"<tr><td colspan='7'>No subscriptions yet.</td></tr>";
 }
 async function loadSubscriberCalendarOptions(){
-  const {data,error}=await supabaseClient.from("e2fit_subscriptions").select("id,box,plan,start_date,end_date,delivery_time,status,e2fit_customers(name,phone)").not("invoice_id","is",null).order("created_at",{ascending:false});
+  const {data,error}=await supabaseClient.from("e2fit_subscriptions").select("id,customer_id,box,plan,start_date,end_date,delivery_time,status,e2fit_customers(name,phone)").not("invoice_id","is",null).order("created_at",{ascending:false});
   if(error){console.error(error);return;}
   const select=document.getElementById("calendarSubscriber"),current=select.value;
   select.innerHTML='<option value="">Select subscriber</option>'+(data||[]).map(s=>{const c=s.e2fit_customers||{};return '<option value="'+s.id+'">'+escapeHtml(c.name||"Customer")+' — '+escapeHtml(s.box)+' ('+escapeHtml(s.plan)+')</option>';}).join("");

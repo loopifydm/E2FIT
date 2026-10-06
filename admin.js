@@ -39,7 +39,7 @@ document.getElementById("logout").addEventListener("click",async()=>{await supab
 
 function monthlyEndDate(startDate){let d=new Date(startDate+"T00:00:00"),count=0;while(count<26){if(d.getDay()!==0)count++;if(count<26)d.setDate(d.getDate()+1);}return d.toISOString().slice(0,10);}
 function weeklyEndDate(startDate){let d=new Date(startDate+"T00:00:00"),count=0;while(count<6){if(d.getDay()!==0)count++;if(count<6)d.setDate(d.getDate()+1);}return d.toISOString().slice(0,10);}
-async function refresh(){await generateToday();await loadOrders();await loadCustomers();await loadSubscriptions();await loadMenu();}
+async function refresh(){await generateToday();await loadOrders();await loadCustomers();await loadSubscriptions();}
 async function generateToday(){const {error}=await supabaseClient.rpc("e2fit_generate_today_deliveries");if(error)console.warn(error.message);}
 async function loadOrders(){
   const today=new Date().toISOString().slice(0,10);
@@ -52,28 +52,6 @@ async function loadCustomers(){
   if(error){console.error(error);return;}
   document.getElementById("customerRows").innerHTML=(data||[]).map(s=>{const c=s.e2fit_customers||{};return `<tr><td><strong>${escapeHtml(c.name||"—")}</strong><small>${escapeHtml(c.phone||"")}</small></td><td>${escapeHtml(s.box)}</td><td>${escapeHtml(s.plan)}</td><td>${escapeHtml(s.delivery_time)}</td><td><span class="pill Active">Active</span></td><td><button class="status-btn" onclick="deleteCustomer('${s.customer_id}')">Delete</button></td></tr>`;}).join("")||"<tr><td colspan='6'>No active subscriptions yet.</td></tr>";
 }
-async function loadMenu(){
-  const {data,error}=await supabaseClient.from("e2fit_weekly_menu").select("id,day_name,breakfast,lunch,sort_order").order("sort_order");
-  if(error){console.error(error);document.getElementById("menuRows").innerHTML="<tr><td colspan='3'>Could not load weekly menu.</td></tr>";return;}
-  document.getElementById("menuRows").innerHTML=(data||[]).map(row=>`<tr><td><strong>${escapeHtml(row.day_name)}</strong></td><td><input class="menu-input" data-id="${row.id}" data-field="breakfast" value="${escapeHtml(row.breakfast)}"></td><td><input class="menu-input" data-id="${row.id}" data-field="lunch" value="${escapeHtml(row.lunch)}"></td></tr>`).join("");
-}
-async function saveMenu(){
-  const button=document.getElementById("saveMenu");
-  const inputs=[...document.querySelectorAll(".menu-input")];
-  const grouped={};
-  inputs.forEach(input=>{grouped[input.dataset.id]??={id:input.dataset.id};grouped[input.dataset.id][input.dataset.field]=input.value.trim();});
-  button.disabled=true;button.textContent="Saving…";
-  try{
-    for(const row of Object.values(grouped)){
-      const {error}=await supabaseClient.from("e2fit_weekly_menu").update({breakfast:row.breakfast||"",lunch:row.lunch||"",updated_at:new Date().toISOString()}).eq("id",row.id);
-      if(error)throw error;
-    }
-    button.textContent="Saved ✓";
-    setTimeout(()=>{button.textContent="Save Menu";},1500);
-  }catch(error){console.error(error);alert("Could not save weekly menu: "+(error.message||"Unknown error"));button.textContent="Save Menu";}
-  finally{button.disabled=false;}
-}
-
 async function loadSubscriptions(){
   const {data,error}=await supabaseClient.from("e2fit_subscriptions").select("id,box,plan,delivery_time,status,start_date,end_date,e2fit_customers(name,phone)").order("created_at",{ascending:false});
   if(error){console.error(error);return;}
@@ -96,7 +74,6 @@ const modal=document.getElementById("orderModal");
 document.getElementById("newOrder").addEventListener("click",()=>modal.classList.remove("hidden"));
 document.getElementById("closeModal").addEventListener("click",()=>modal.classList.add("hidden"));
 document.getElementById("saveOrder").addEventListener("click",saveOrder);
-document.getElementById("saveMenu").addEventListener("click",saveMenu);
 async function saveOrder(){
   const fields={name:document.getElementById("name"),phone:document.getElementById("phone"),box:document.getElementById("box"),plan:document.getElementById("plan"),delivery:document.getElementById("delivery"),address:document.getElementById("address")};
   const button=document.getElementById("saveOrder");
@@ -112,6 +89,28 @@ async function saveOrder(){
     modal.classList.add("hidden");fields.name.value="";fields.phone.value="";fields.address.value="";await refresh();
   }catch(error){console.error(error);alert("Could not save order: "+(error.message||"Unknown error"));}finally{button.disabled=false;button.textContent="Save Order";}
 }
+
+const invoicePrices={"Mixed Box":{Daily:60,Weekly:360,Monthly:1499},"Medium Box":{Daily:80,Weekly:480,Monthly:1999},"Premium Box":{Daily:100,Weekly:600,Monthly:2499},"Premium Pro Box":{Daily:120,Weekly:720,Monthly:2999}};
+function invoicePlanKey(){const v=document.getElementById("invoicePlan").value;return v.startsWith("Weekly")?"Weekly":v.startsWith("Monthly")?"Monthly":"Daily";}
+function updateInvoiceAmount(){const box=document.getElementById("invoiceBox").value;document.getElementById("invoiceAmount").value=invoicePrices[box][invoicePlanKey()];}
+function invoiceNumber(){const d=new Date();return "E2FIT-"+d.getFullYear()+String(d.getMonth()+1).padStart(2,"0")+String(d.getDate()).padStart(2,"0")+"-"+Math.floor(1000+Math.random()*9000);}
+function generateInvoice(){
+  const name=document.getElementById("invoiceCustomer").value.trim(),phone=document.getElementById("invoicePhone").value.trim(),address=document.getElementById("invoiceAddress").value.trim(),box=document.getElementById("invoiceBox").value,plan=document.getElementById("invoicePlan").value,amount=Number(document.getElementById("invoiceAmount").value||0),date=document.getElementById("invoiceDate").value||new Date().toISOString().slice(0,10);
+  if(!name){alert("Enter the customer name.");return;}
+  const planKey=invoicePlanKey(),invoiceNo=invoiceNumber();
+  document.getElementById("invoicePreview").innerHTML=`<div class="invoice-paper"><div class="invoice-brand"><div><div class="invoice-logo">E2<span>FIT</span></div><small>Fresh. Healthy. Better Every Day.</small></div><div class="invoice-meta"><strong>INVOICE</strong><span>${escapeHtml(invoiceNo)}</span><span>${escapeHtml(date)}</span></div></div><div class="invoice-customer"><div><small>BILL TO</small><strong>${escapeHtml(name)}</strong><span>${escapeHtml(phone)}</span><span>${escapeHtml(address)}</span></div></div><table class="invoice-table"><thead><tr><th>Description</th><th>Plan</th><th class="amount">Amount</th></tr></thead><tbody><tr><td>${escapeHtml(box)}</td><td>${escapeHtml(planKey)}</td><td class="amount">₹${amount.toLocaleString("en-IN")}</td></tr></tbody></table><div class="invoice-total"><span>Total</span><strong>₹${amount.toLocaleString("en-IN")}</strong></div><div class="invoice-footer">Thank you for choosing E2FIT.<br>Gandhi Park, Coimbatore · Free delivery up to 5 km</div></div>`;
+}
+function printInvoice(){
+  const paper=document.querySelector(".invoice-paper");if(!paper){alert("Generate an invoice first.");return;}
+  const w=window.open("","_blank");w.document.write(`<!doctype html><html><head><title>E2FIT Invoice</title><style>body{font-family:Arial,sans-serif;padding:35px;color:#173f2b}.invoice-paper{max-width:760px;margin:auto;border:1px solid #ddd;padding:40px}.invoice-brand{display:flex;justify-content:space-between;border-bottom:1px solid #ddd;padding-bottom:25px}.invoice-logo{font-size:28px;font-weight:800}.invoice-logo span{color:#7cab46}.invoice-meta{text-align:right}.invoice-meta span,.invoice-meta strong{display:block}.invoice-customer{padding:30px 0}.invoice-customer small,.invoice-customer strong,.invoice-customer span{display:block;margin:4px 0}.invoice-table{width:100%;border-collapse:collapse}.invoice-table th,.invoice-table td{text-align:left;padding:14px 8px;border-bottom:1px solid #ddd}.amount{text-align:right!important}.invoice-total{display:flex;justify-content:flex-end;gap:80px;padding:22px 8px;font-size:18px}.invoice-footer{text-align:center;border-top:1px solid #ddd;padding-top:25px;color:#666;font-size:12px}</style></head><body>${paper.outerHTML}</body></html>`);w.document.close();w.focus();setTimeout(()=>w.print(),300);
+}
+document.getElementById("invoiceBox").addEventListener("change",updateInvoiceAmount);
+document.getElementById("invoicePlan").addEventListener("change",updateInvoiceAmount);
+document.getElementById("generateInvoice").addEventListener("click",generateInvoice);
+document.getElementById("printInvoice").addEventListener("click",printInvoice);
+document.getElementById("invoiceDate").value=new Date().toISOString().slice(0,10);
+updateInvoiceAmount();
+
 function escapeHtml(value){return String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]));}
 document.querySelectorAll("aside nav a").forEach(a=>a.addEventListener("click",e=>{e.preventDefault();const target=document.querySelector(a.getAttribute("href"));if(target){document.querySelectorAll("aside nav a").forEach(x=>x.classList.remove("active"));a.classList.add("active");target.scrollIntoView({behavior:"smooth",block:"start"});}}));
 boot();

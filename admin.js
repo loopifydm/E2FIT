@@ -101,7 +101,7 @@ async function editInvoice(id){
   const {data,error}=await supabaseClient.from("e2fit_invoices").select("*").eq("id",id).single();if(error){alert(error.message);return;}
   editingInvoiceId=id;editingInvoiceNumber=data.invoice_number;
   document.getElementById("invoiceCustomer").value=data.customer_name||"";document.getElementById("invoicePhone").value=data.phone||"";document.getElementById("invoiceAddress").value=data.address||"";document.getElementById("invoiceBox").value=data.box||"Mixed Box";document.getElementById("invoicePlan").value=data.plan==="Weekly"?"Weekly (6 days)":data.plan==="Monthly"?"Monthly (26 days)":"Daily";document.getElementById("invoiceAmount").value=data.amount;document.getElementById("invoiceDate").value=data.invoice_date;updateInvoiceAmount();
-  document.getElementById("invoices").scrollIntoView({behavior:"smooth"});await renderInvoice(data.invoice_number);
+  document.getElementById("generateInvoice").textContent="Update Invoice";document.getElementById("invoices").scrollIntoView({behavior:"smooth"});await renderInvoice(data.invoice_number);
 }
 async function renderInvoice(invoiceNoOverride){
   const name=document.getElementById("invoiceCustomer").value.trim(),phone=document.getElementById("invoicePhone").value.trim(),address=document.getElementById("invoiceAddress").value.trim(),box=document.getElementById("invoiceBox").value,plan=document.getElementById("invoicePlan").value,amount=Number(document.getElementById("invoiceAmount").value||0),date=document.getElementById("invoiceDate").value||new Date().toISOString().slice(0,10);
@@ -125,7 +125,7 @@ async function generateInvoice(){
   if(editingInvoiceId) result=await supabaseClient.from("e2fit_invoices").update(payload).eq("id",editingInvoiceId);
   else result=await supabaseClient.from("e2fit_invoices").insert({...payload,invoice_number:invoiceNo}).select("id").single();
   if(result.error){alert("Could not save invoice: "+result.error.message);return;}
-  if(!editingInvoiceId&&result.data)editingInvoiceId=result.data.id;
+  if(!editingInvoiceId&&result.data)editingInvoiceId=result.data.id;document.getElementById("generateInvoice").textContent="Update Invoice";
   editingInvoiceNumber=invoiceNo;
   await renderInvoice(invoiceNo);await loadInvoices();
 }

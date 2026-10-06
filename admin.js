@@ -103,19 +103,44 @@ async function renderSubscriberCalendar(){
   // The original plan end is the normal 6/26 delivery-day horizon.
   // Every explicitly not-brought day extends the subscription by one non-Sunday delivery day.
   let effectiveEnd=sub.end_date;
+  let scanEnd=sub.end_date;
   let safety=0;
-  while(safety<400){
-    const skipped=Object.values(byDate).filter(r=>r.delivery_date>=sub.start_date && r.delivery_date<=effectiveEnd && r.status!=="Delivered").length;
+  while(safety<100){
+    const newlySkipped=Object.values(byDate).filter(r=>r.delivery_date>scanEnd && r.delivery_date<=effectiveEnd && r.status!=="Delivered").length;
+    if(newlySkipped===0)break;
     let d=new Date(effectiveEnd+"T12:00:00Z"),added=0;
-    while(added<skipped){
+    while(added<newlySkipped){
       d.setUTCDate(d.getUTCDate()+1);
       if(d.getUTCDay()!==0)added++;
     }
-    const next=d.toISOString().slice(0,10);
-    if(next===effectiveEnd)break;
-    effectiveEnd=next;safety++;
-    const newSkipped=Object.values(byDate).filter(r=>r.delivery_date>=sub.start_date && r.delivery_date<=effectiveEnd && r.status!=="Delivered").length;
-    if(newSkipped===skipped)break;
+    effectiveEnd=d.toISOString().slice(0,10);
+    scanEnd=effectiveEnd;
+    safety++;
+  }
+  // Include missed days that occurred inside the original plan window.
+  const initialSkipped=Object.values(byDate).filter(r=>r.delivery_date>=sub.start_date && r.delivery_date<=sub.end_date && r.status!=="Delivered").length;
+  if(initialSkipped){
+    let d=new Date(sub.end_date+"T12:00:00Z"),added=0;
+    while(added<initialSkipped){
+      d.setUTCDate(d.getUTCDate()+1);
+      if(d.getUTCDay()!==0)added++;
+    }
+    effectiveEnd=d.toISOString().slice(0,10);
+    // Extend again if a missed day was recorded in the first extension.
+    let changed=true;
+    while(changed&&safety<100){
+      changed=false;
+      const extensionSkipped=Object.values(byDate).filter(r=>r.delivery_date>sub.end_date && r.delivery_date<=effectiveEnd && r.status!=="Delivered").length;
+      const requiredEnd=new Date(sub.end_date+"T12:00:00Z");
+      let count=0;
+      while(count<initialSkipped+extensionSkipped){
+        requiredEnd.setUTCDate(requiredEnd.getUTCDate()+1);
+        if(requiredEnd.getUTCDay()!==0)count++;
+      }
+      const next=requiredEnd.toISOString().slice(0,10);
+      if(next!==effectiveEnd){effectiveEnd=next;changed=true}
+      safety++;
+    }
   }
 
   const monthStart=monthValue+"-01";

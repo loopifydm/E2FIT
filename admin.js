@@ -25,7 +25,7 @@ document.getElementById("loginBtn").onclick=async()=>{
 };
 document.getElementById("logout").onclick=async()=>{await supabaseClient.auth.signOut();location.reload();};
 function monthlyEndDate(startDate){let d=new Date(startDate+"T00:00:00");let count=0;while(count<26){if(d.getDay()!==0)count++;if(count<26)d.setDate(d.getDate()+1);}return d.toISOString().slice(0,10);}
-async function refresh(){await generateToday();await loadOrders();await loadCustomers();}
+async function refresh(){await generateToday();await loadOrders();await loadCustomers();await loadSubscriptions();}
 async function generateToday(){const {error}=await supabaseClient.rpc("e2fit_generate_today_deliveries");if(error)console.warn("Delivery generation:",error.message);}
 async function loadOrders(){
   const today=new Date().toISOString().slice(0,10);
@@ -36,6 +36,12 @@ async function loadCustomers(){
   const {data,error}=await supabaseClient.from("e2fit_subscriptions").select("id,box,plan,delivery_time,status,start_date,end_date,e2fit_customers(name,phone)").eq("status","active").order("created_at",{ascending:false});
   if(error){console.error(error);return;}
   document.getElementById("customerRows").innerHTML=(data||[]).map(s=>{const c=s.e2fit_customers||{};return "<tr><td><strong>"+escapeHtml(c.name||"—")+"</strong><small>"+escapeHtml(c.phone||"")+"</small></td><td>"+escapeHtml(s.box)+"</td><td>"+escapeHtml(s.plan)+"</td><td>"+escapeHtml(s.delivery_time)+"</td><td><span class='pill Active'>Active</span></td></tr>";}).join("")||"<tr><td colspan='5'>No active subscriptions yet.</td></tr>";
+}
+async function loadSubscriptions(){
+  const {data,error}=await supabaseClient.from("e2fit_subscriptions").select("id,box,plan,delivery_time,status,start_date,end_date,e2fit_customers(name,phone)").order("created_at",{ascending:false});
+  if(error){console.error(error);return;}
+  const rows=document.getElementById("subscriptionRows");
+  rows.innerHTML=(data||[]).map(s=>{const c=s.e2fit_customers||{};return "<tr><td><strong>"+escapeHtml(c.name||"—")+"</strong><small>"+escapeHtml(c.phone||"")+"</small></td><td>"+escapeHtml(s.box)+"</td><td>"+escapeHtml(s.plan)+"</td><td>"+escapeHtml(s.delivery_time)+"</td><td>"+escapeHtml(s.start_date)+"</td><td>"+escapeHtml(s.end_date)+"</td><td><span class='pill "+escapeHtml(s.status)+"'>"+escapeHtml(s.status)+"</span></td></tr>";}).join("")||"<tr><td colspan='7'>No subscriptions yet.</td></tr>";
 }
 function render(){
   const filter=document.getElementById("filter").value,visible=filter==="All"?orders:orders.filter(o=>o.status===filter);
@@ -62,4 +68,5 @@ document.getElementById("saveOrder").onclick=async()=>{
   }catch(error){alert("Could not save order: "+error.message);}finally{button.disabled=false;button.textContent="Save Order";}
 };
 function escapeHtml(value){return String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]));}
+document.querySelectorAll("aside nav a").forEach(a=>a.addEventListener("click",e=>{e.preventDefault();const target=document.querySelector(a.getAttribute("href"));if(target){document.querySelectorAll("aside nav a").forEach(x=>x.classList.remove("active"));a.classList.add("active");target.scrollIntoView({behavior:"smooth",block:"start"});}}));
 boot();

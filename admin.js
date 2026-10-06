@@ -77,7 +77,8 @@ function statusClass(status){return status==="Out for Delivery"?"Out":status.rep
 async function advance(id,next){const {error}=await supabaseClient.from("e2fit_deliveries").update({status:next,updated_at:new Date().toISOString()}).eq("id",id);if(error){alert("Could not update delivery: "+error.message);return;}await loadOrders();}
 async function deleteCustomer(id){if(!id||!confirm("Delete this customer and all their subscriptions and deliveries?"))return;const {error}=await supabaseClient.from("e2fit_customers").delete().eq("id",id);if(error){alert("Could not delete customer: "+error.message);return;}await refresh();}
 
-document.getElementById("filter").addEventListener("change",render);\ndocument.getElementById("enquiryFilter")?.addEventListener("change",loadEnquiries);
+document.getElementById("filter").addEventListener("change",render);
+document.getElementById("enquiryFilter")?.addEventListener("change",loadEnquiries);
 const invoicePrices={"Mixed Box":{Daily:60,Weekly:360,Monthly:1499},"Medium Box":{Daily:80,Weekly:480,Monthly:1999},"Premium Box":{Daily:100,Weekly:600,Monthly:2499},"Premium Pro Box":{Daily:120,Weekly:720,Monthly:2999}};
 async function loadInvoices(){
   const {data,error}=await supabaseClient.from("e2fit_invoices").select("*").order("created_at",{ascending:false});

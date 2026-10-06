@@ -17,7 +17,7 @@ document.getElementById("loginBtn").onclick=async()=>{
   const username=document.getElementById("adminEmail").value.trim(),password=document.getElementById("adminPass").value,errorBox=document.getElementById("loginError");
   errorBox.textContent="";if(!username||!password){errorBox.textContent="Enter your username and password.";return;}
   const button=document.getElementById("loginBtn");button.disabled=true;button.textContent="Signing in…";
-  const {error}=await supabaseClient.auth.signInWithPassword({email:username==="admin"?"loopifydm@gmail.com":username,password});
+  const {error}=await supabaseClient.auth.signInWithPassword({email:username==="admin"?"admin@e2fit.local":username,password});
   button.disabled=false;button.textContent="Sign in →";
   if(error){errorBox.textContent=error.message;return;}
   if(!(await isAdmin())){await supabaseClient.auth.signOut();errorBox.textContent="Signed in, but this account is not an E2FIT admin.";return;}

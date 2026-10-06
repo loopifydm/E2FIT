@@ -100,16 +100,16 @@ let editingInvoiceId=null,editingInvoiceNumber=null;
 async function editInvoice(id){
   const {data,error}=await supabaseClient.from("e2fit_invoices").select("*").eq("id",id).single();if(error){alert(error.message);return;}
   editingInvoiceId=id;editingInvoiceNumber=data.invoice_number;
-  document.getElementById("invoiceCustomer").value=data.customer_name||"";document.getElementById("invoicePhone").value=data.phone||"";document.getElementById("invoiceAddress").value=data.address||"";document.getElementById("invoiceBox").value=data.box||"Mixed Box";document.getElementById("invoicePlan").value=data.plan==="Weekly"?"Weekly (6 days)":data.plan==="Monthly"?"Monthly (26 days)":"Daily";document.getElementById("invoiceAmount").value=data.amount;document.getElementById("invoiceStartDate").value=data.start_date||data.invoice_date;document.getElementById("invoiceEndDate").value=data.end_date||data.invoice_date;document.getElementById("invoiceAdvance").value=data.advance_amount||0;document.getElementById("invoiceBalance").value=data.balance_amount??Math.max(0,Number(data.amount||0)-Number(data.advance_amount||0));updateInvoiceBalance();document.getElementById("invoiceDate").value=data.invoice_date;updateInvoiceAmount();
+  document.getElementById("invoiceCustomer").value=data.customer_name||"";document.getElementById("invoicePhone").value=data.phone||"";document.getElementById("invoiceAddress").value=data.address||"";document.getElementById("invoiceBox").value=data.box||"Mixed Box";document.getElementById("invoicePlan").value=data.plan==="Weekly"?"Weekly (6 days)":data.plan==="Monthly"?"Monthly (26 days)":"Daily";document.getElementById("invoiceDeliveryTime").value=data.delivery_time||"Breakfast";document.getElementById("invoiceAmount").value=data.amount;document.getElementById("invoiceStartDate").value=data.start_date||data.invoice_date;document.getElementById("invoiceEndDate").value=data.end_date||data.invoice_date;document.getElementById("invoiceAdvance").value=data.advance_amount||0;document.getElementById("invoiceBalance").value=data.balance_amount??Math.max(0,Number(data.amount||0)-Number(data.advance_amount||0));updateInvoiceBalance();document.getElementById("invoiceDate").value=data.invoice_date;updateInvoiceAmount();
   document.getElementById("generateInvoice").textContent="Update Invoice";document.getElementById("invoices").scrollIntoView({behavior:"smooth"});await renderInvoice(data.invoice_number);
 }
 async function renderInvoice(invoiceNoOverride){
-  const name=document.getElementById("invoiceCustomer").value.trim(),phone=document.getElementById("invoicePhone").value.trim(),address=document.getElementById("invoiceAddress").value.trim(),box=document.getElementById("invoiceBox").value,plan=document.getElementById("invoicePlan").value,startDate=document.getElementById("invoiceStartDate").value,endDate=document.getElementById("invoiceEndDate").value,amount=Number(document.getElementById("invoiceAmount").value||0),advance=Number(document.getElementById("invoicePaid")?.checked?amount:document.getElementById("invoiceAdvance").value||0),balance=Math.max(0,amount-advance),date=document.getElementById("invoiceDate").value||new Date().toISOString().slice(0,10);
+  const name=document.getElementById("invoiceCustomer").value.trim(),phone=document.getElementById("invoicePhone").value.trim(),address=document.getElementById("invoiceAddress").value.trim(),box=document.getElementById("invoiceBox").value,plan=document.getElementById("invoicePlan").value,startDate=document.getElementById("invoiceStartDate").value,endDate=document.getElementById("invoiceEndDate").value,deliveryTime=document.getElementById("invoiceDeliveryTime").value||"Breakfast",amount=Number(document.getElementById("invoiceAmount").value||0),advance=Number(document.getElementById("invoicePaid")?.checked?amount:document.getElementById("invoiceAdvance").value||0),balance=Math.max(0,amount-advance),date=document.getElementById("invoiceDate").value||new Date().toISOString().slice(0,10);
   if(!name)return;
   const planKey=invoicePlanKey(),invoiceNo=invoiceNoOverride||await invoiceNumber();document.getElementById("invoiceBalance").value=balance;
-  document.getElementById("invoicePreview").innerHTML=`<div class="invoice-paper"><div class="invoice-brand"><div><img class="invoice-logo-img" src="https://loopifydm.github.io/E2FIT/assets/e2fit-logo.jpg" alt="E2FIT"><small>Fresh. Healthy. Better Every Day.</small></div><div class="invoice-meta"><strong>INVOICE</strong><span>${escapeHtml(invoiceNo)}</span><span>${escapeHtml(date)}</span></div></div><div class="invoice-customer"><div><small>BILL TO</small><strong>${escapeHtml(name)}</strong><span>${escapeHtml(phone)}</span><span>${escapeHtml(address)}</span></div></div><table class="invoice-table"><thead><tr><th>Description</th><th>Plan</th><th class="amount">Amount</th></tr></thead><tbody><tr><td>${escapeHtml(box)}</td><td>${escapeHtml(planKey)}</td><td class="amount">₹${amount.toLocaleString("en-IN")}</td></tr></tbody></table><div class="invoice-period"><strong>Plan Period:</strong> ${escapeHtml(startDate)} to ${escapeHtml(endDate)}</div><div class="invoice-total invoice-payment"><div><span>Total Amount</span><strong>₹${amount.toLocaleString("en-IN")}</strong></div><div><span>Advance Amount</span><strong>₹${advance.toLocaleString("en-IN")}</strong></div><div><span>Balance Amount</span><strong>₹${balance.toLocaleString("en-IN")}</strong></div><div><span>Payment Status</span><strong>${balance===0?"FULLY PAID":"PARTIALLY PAID"}</strong></div></div><div class="invoice-footer">Thank you for choosing E2FIT.<br>Gandhi Park, Coimbatore · Free delivery up to 5 km</div></div>`;
+  document.getElementById("invoicePreview").innerHTML=`<div class="invoice-paper"><div class="invoice-brand"><div><img class="invoice-logo-img" src="https://loopifydm.github.io/E2FIT/assets/e2fit-logo.jpg" alt="E2FIT"><small>Fresh. Healthy. Better Every Day.</small></div><div class="invoice-meta"><strong>INVOICE</strong><span>${escapeHtml(invoiceNo)}</span><span>${escapeHtml(date)}</span></div></div><div class="invoice-customer"><div><small>BILL TO</small><strong>${escapeHtml(name)}</strong><span>${escapeHtml(phone)}</span><span>${escapeHtml(address)}</span></div></div><table class="invoice-table"><thead><tr><th>Description</th><th>Plan</th><th class="amount">Amount</th></tr></thead><tbody><tr><td>${escapeHtml(box)}</td><td>${escapeHtml(planKey)}</td><td class="amount">₹${amount.toLocaleString("en-IN")}</td></tr></tbody></table><div class="invoice-period"><strong>Plan Period:</strong> ${escapeHtml(startDate)} to ${escapeHtml(endDate)} · <strong>Delivery:</strong> ${escapeHtml(document.getElementById("invoiceDeliveryTime").value||"Breakfast")}</div><div class="invoice-total invoice-payment"><div><span>Total Amount</span><strong>₹${amount.toLocaleString("en-IN")}</strong></div><div><span>Advance Amount</span><strong>₹${advance.toLocaleString("en-IN")}</strong></div><div><span>Balance Amount</span><strong>₹${balance.toLocaleString("en-IN")}</strong></div><div><span>Payment Status</span><strong>${balance===0?"FULLY PAID":"PARTIALLY PAID"}</strong></div></div><div class="invoice-footer">Thank you for choosing E2FIT.<br>Gandhi Park, Coimbatore · Free delivery up to 5 km</div></div>`;
 }
-async function deleteInvoice(id){if(!confirm("Delete this invoice? This cannot be undone."))return;const {error}=await supabaseClient.from("e2fit_invoices").delete().eq("id",id);if(error){alert("Could not delete invoice: "+error.message);return;}if(editingInvoiceId===id){editingInvoiceId=null;editingInvoiceNumber=null;}await loadInvoices();}
+async function deleteInvoice(id){if(!confirm("Delete this invoice and its linked subscriber? This cannot be undone."))return;const {data:inv,error:invError}=await supabaseClient.from("e2fit_invoices").select("id").eq("id",id).single();if(invError){alert(invError.message);return;}const {data:sub,error:subError}=await supabaseClient.from("e2fit_subscriptions").select("id,customer_id").eq("invoice_id",id).maybeSingle();if(subError){alert(subError.message);return;}if(sub){await supabaseClient.from("e2fit_deliveries").delete().eq("subscription_id",sub.id);await supabaseClient.from("e2fit_subscriptions").delete().eq("id",sub.id);const {data:other}=await supabaseClient.from("e2fit_subscriptions").select("id").eq("customer_id",sub.customer_id).limit(1);if(!other?.length)await supabaseClient.from("e2fit_customers").delete().eq("id",sub.customer_id);}const {error}=await supabaseClient.from("e2fit_invoices").delete().eq("id",id);if(error){alert("Could not delete invoice: "+error.message);return;}if(editingInvoiceId===id){editingInvoiceId=null;editingInvoiceNumber=null;}await loadInvoices();}
 async function printSavedInvoice(id){await editInvoice(id);setTimeout(()=>printInvoice(),200);}
 
 function invoicePlanKey(){const v=document.getElementById("invoicePlan").value;return v.startsWith("Weekly")?"Weekly":v.startsWith("Monthly")?"Monthly":"Daily";}
@@ -117,6 +117,41 @@ function planEndDate(startDate,plan){if(!startDate)return "";if(plan==="Daily")r
 function updateInvoicePlanDates(){const start=document.getElementById("invoiceStartDate"),end=document.getElementById("invoiceEndDate");if(!start||!end)return;if(!start.value)start.value=new Date().toISOString().slice(0,10);end.value=planEndDate(start.value,invoicePlanKey());}
 function updateInvoiceAmount(){const box=document.getElementById("invoiceBox").value;document.getElementById("invoiceAmount").value=invoicePrices[box][invoicePlanKey()];updateInvoiceBalance();}document.getElementById("invoicePaid")?.addEventListener("change",()=>updateInvoiceBalance());function updateInvoiceBalance(){const total=Number(document.getElementById("invoiceAmount").value||0),paid=document.getElementById("invoicePaid")?.checked||false,advance=paid?total:Number(document.getElementById("invoiceAdvance").value||0);document.getElementById("invoiceAdvance").value=advance;document.getElementById("invoiceBalance").value=Math.max(0,total-advance);}
 async function invoiceNumber(){const {data,error}=await supabaseClient.rpc("e2fit_next_invoice_number");if(error)throw error;return data;}
+async function syncSubscriberFromInvoice(invoiceId,invoiceData){
+  let customerId=null;
+  const phone=(invoiceData.phone||"").trim();
+  if(phone){
+    const {data,error}=await supabaseClient.from("e2fit_customers").select("id").eq("phone",phone).maybeSingle();
+    if(error)throw error;
+    customerId=data?.id||null;
+  }
+  if(!customerId){
+    const {data,error}=await supabaseClient.from("e2fit_customers").insert({name:invoiceData.customer_name,phone:invoiceData.phone||"",address:invoiceData.address||""}).select("id").single();
+    if(error)throw error;
+    customerId=data.id;
+  }else{
+    const {error}=await supabaseClient.from("e2fit_customers").update({name:invoiceData.customer_name,address:invoiceData.address||""}).eq("id",customerId);
+    if(error)throw error;
+  }
+  const prices=invoicePrices[invoiceData.box];
+  const subscriptionPayload={customer_id:customerId,invoice_id:invoiceId,box:invoiceData.box,plan:invoiceData.plan,daily_price:prices.Daily,monthly_price:invoiceData.amount,start_date:invoiceData.start_date,end_date:invoiceData.end_date,delivery_time:invoiceData.delivery_time,status:"active",updated_at:new Date().toISOString()};
+  const {data:existing,error:findError}=await supabaseClient.from("e2fit_subscriptions").select("id").eq("invoice_id",invoiceId).maybeSingle();
+  if(findError)throw findError;
+  let subscriptionId=existing?.id;
+  if(subscriptionId){
+    const {error}=await supabaseClient.from("e2fit_subscriptions").update(subscriptionPayload).eq("id",subscriptionId);
+    if(error)throw error;
+    const {error:deliveryError}=await supabaseClient.from("e2fit_deliveries").update({delivery_time:invoiceData.delivery_time,box:invoiceData.box,address:invoiceData.address||"",updated_at:new Date().toISOString()}).eq("subscription_id",subscriptionId).in("status",["Pending","Preparing","Out for Delivery"]);
+    if(deliveryError)throw deliveryError;
+  }else{
+    const {data:subscription,error}=await supabaseClient.from("e2fit_subscriptions").insert(subscriptionPayload).select("id").single();
+    if(error)throw error;
+    subscriptionId=subscription.id;
+  }
+  await supabaseClient.rpc("e2fit_generate_today_deliveries");
+  return {customerId,subscriptionId};
+}
+
 async function generateInvoice(){
   const name=document.getElementById("invoiceCustomer").value.trim(),phone=document.getElementById("invoicePhone").value.trim(),address=document.getElementById("invoiceAddress").value.trim(),box=document.getElementById("invoiceBox").value,plan=document.getElementById("invoicePlan").value,startDate=document.getElementById("invoiceStartDate").value,endDate=document.getElementById("invoiceEndDate").value,amount=Number(document.getElementById("invoiceAmount").value||0),advance=Number(document.getElementById("invoicePaid")?.checked?amount:document.getElementById("invoiceAdvance").value||0),balance=Math.max(0,amount-advance),date=document.getElementById("invoiceDate").value||new Date().toISOString().slice(0,10);
   if(!name){alert("Enter the customer name.");return;}
@@ -124,7 +159,7 @@ async function generateInvoice(){
   let result,invoiceNo;
   if(editingInvoiceId){
     invoiceNo=editingInvoiceNumber;
-    const payload={customer_name:name,phone,address,box,plan:planKey,amount,advance_amount:advance,balance_amount:balance,invoice_date:date,start_date:startDate,end_date:endDate,updated_at:new Date().toISOString()};
+    const payload={customer_name:name,phone,address,box,plan:planKey,delivery_time:deliveryTime,amount,advance_amount:advance,balance_amount:balance,invoice_date:date,start_date:startDate,end_date:endDate,updated_at:new Date().toISOString()};\n    if(!result.error){try{await syncSubscriberFromInvoice(editingInvoiceId,{customer_name:name,phone,address,box,plan:planKey,delivery_time:deliveryTime,amount,start_date:startDate,end_date:endDate});}catch(error){alert("Invoice updated, but subscriber sync failed: "+(error.message||"Unknown error"));}}
     result=await supabaseClient.from("e2fit_invoices").update(payload).eq("id",editingInvoiceId);
     if(!result.error){await renderInvoice(invoiceNo);await loadInvoices();}
     if(result.error){alert("Could not update invoice: "+result.error.message);return;}
@@ -133,7 +168,8 @@ async function generateInvoice(){
     return;
   }
   try{invoiceNo=await invoiceNumber();}catch(error){alert("Could not generate invoice number: "+error.message);return;}
-  const payload={invoice_number:invoiceNo,customer_name:name,phone,address,box,plan:planKey,amount,advance_amount:advance,balance_amount:balance,invoice_date:date,start_date:startDate,end_date:endDate,updated_at:new Date().toISOString()};
+  const payload={invoice_number:invoiceNo,customer_name:name,phone,address,box,plan:planKey,delivery_time:deliveryTime,amount,advance_amount:advance,balance_amount:balance,invoice_date:date,start_date:startDate,end_date:endDate,updated_at:new Date().toISOString()};
+  try{await syncSubscriberFromInvoice(result.data.id,{customer_name:name,phone,address,box,plan:planKey,delivery_time:deliveryTime,amount,start_date:startDate,end_date:endDate});}catch(error){await supabaseClient.from("e2fit_invoices").delete().eq("id",result.data.id);alert("Invoice was not created because the subscriber could not be saved: "+(error.message||"Unknown error"));return;}
   result=await supabaseClient.from("e2fit_invoices").insert(payload).select("id").single();
   if(result.error){alert("Could not save invoice: "+result.error.message);return;}
   await renderInvoice(invoiceNo);
@@ -146,7 +182,7 @@ function resetInvoiceGenerator(){
   const paid=document.getElementById("invoicePaid");if(paid)paid.checked=false;
   const date=document.getElementById("invoiceDate");if(date)date.value=new Date().toISOString().slice(0,10);const today=new Date().toISOString().slice(0,10);const start=document.getElementById("invoiceStartDate");const end=document.getElementById("invoiceEndDate");if(start)start.value=today;if(end)end.value=planEndDate(today,invoicePlanKey());
   const box=document.getElementById("invoiceBox");if(box)box.selectedIndex=0;
-  const plan=document.getElementById("invoicePlan");if(plan)plan.selectedIndex=0;
+  const plan=document.getElementById("invoicePlan");if(plan)plan.selectedIndex=0;const deliveryTime=document.getElementById("invoiceDeliveryTime");if(deliveryTime)deliveryTime.selectedIndex=0;
   editingInvoiceId=null;editingInvoiceNumber=null;
   const btn=document.getElementById("generateInvoice");if(btn)btn.textContent="Generate Invoice";
   const preview=document.getElementById("invoicePreview");if(preview)preview.innerHTML='<div class="invoice-placeholder">Enter customer details and click <strong>Generate Invoice</strong>.</div>';
@@ -157,7 +193,7 @@ function printInvoice(){
 }
 document.getElementById("invoiceBox").addEventListener("change",updateInvoiceAmount);
 document.getElementById("invoicePlan").addEventListener("change",()=>{updateInvoiceAmount();updateInvoicePlanDates();});document.getElementById("invoiceStartDate").addEventListener("change",updateInvoicePlanDates);
-document.getElementById("invoiceAdvance").addEventListener("input",updateInvoiceBalance);document.getElementById("invoiceAmount").addEventListener("input",updateInvoiceBalance);document.getElementById("generateInvoice").addEventListener("click",generateInvoice);
+document.getElementById("invoiceDeliveryTime").addEventListener("change",()=>{if(document.getElementById("invoiceCustomer").value.trim())renderInvoice(editingInvoiceNumber||null);});document.getElementById("invoiceAdvance").addEventListener("input",updateInvoiceBalance);document.getElementById("invoiceAmount").addEventListener("input",updateInvoiceBalance);document.getElementById("generateInvoice").addEventListener("click",generateInvoice);
 document.getElementById("printInvoice").addEventListener("click",printInvoice);
 document.getElementById("invoiceDate").value=new Date().toISOString().slice(0,10);
 updateInvoiceAmount();

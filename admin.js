@@ -91,7 +91,16 @@ async function renderSubscriberCalendar(){
   const byDate={};(data||[]).forEach(d=>byDate[d.delivery_date]=d);
   const dates=[];let d=new Date(start+"T00:00:00"),last=new Date(end+"T00:00:00");
   while(d<=last){if(d.getDay()!==0)dates.push(d.toISOString().slice(0,10));d.setDate(d.getDate()+1);}
-  box.innerHTML='<div class="calendar-summary"><strong>'+escapeHtml((sub.e2fit_customers||{}).name||"Subscriber")+'</strong><span>'+escapeHtml(sub.box)+' · '+escapeHtml(sub.plan)+' · '+escapeHtml(sub.delivery_time)+'</span><span>Plan: '+escapeHtml(sub.start_date)+' to '+escapeHtml(sub.end_date)+'</span></div><div class="calendar-grid">'+dates.map(date=>{const rec=byDate[date],done=rec?.status==="Delivered";const label=new Date(date+"T00:00:00").toLocaleDateString("en-IN",{weekday:"short",day:"2-digit",month:"short"});return '<label class="calendar-day '+(done?"done":"")+'"><input type="checkbox" '+(done?"checked":"")+' data-delivery-id="'+(rec?.id||"")+'" data-subscription-id="'+sub.id+'" data-date="'+date+'"><span class="day-check">'+(done?"✓":"")+'</span><span class="day-info"><strong>'+label+'</strong><small>'+(done?"Box brought":"Not brought")+'</small></span></label>';}).join("")+'</div>';
+  const firstDay=new Date(dates[0]+"T00:00:00").getDay();
+  const leadingBlanks=Math.min((firstDay+6)%7,5);
+  const weekdayHeader=["Mon","Tue","Wed","Thu","Fri","Sat"].map(day=>'<div class="calendar-weekday">'+day+'</div>').join("");
+  const spacers=Array.from({length:leadingBlanks},()=>'<div class="calendar-spacer"></div>').join("");
+  const days=dates.map(date=>{
+    const rec=byDate[date],done=rec?.status==="Delivered",dt=new Date(date+"T00:00:00");
+    const label=dt.toLocaleDateString("en-IN",{weekday:"short",day:"2-digit",month:"short"});
+    return '<label class="calendar-day '+(done?"done":"")+'"><input type="checkbox" '+(done?"checked":"")+' data-delivery-id="'+(rec?.id||"")+'" data-subscription-id="'+sub.id+'" data-date="'+date+'"><span class="day-check">'+(done?"✓":"")+'</span><span class="day-info"><strong>'+label+'</strong><small>'+(done?"Box brought":"Not brought")+'</small></span></label>';
+  }).join("");
+  box.innerHTML='<div class="calendar-summary"><strong>'+escapeHtml((sub.e2fit_customers||{}).name||"Subscriber")+'</strong><span>'+escapeHtml(sub.box)+' · '+escapeHtml(sub.plan)+' · '+escapeHtml(sub.delivery_time)+'</span><span>Plan: '+escapeHtml(sub.start_date)+' to '+escapeHtml(sub.end_date)+'</span></div><div class="calendar-scroll"><div class="calendar-grid">'+weekdayHeader+spacers+days+'</div></div>';
   box.querySelectorAll('input[type="checkbox"]').forEach(input=>input.addEventListener("change",()=>toggleCalendarDelivery(input)));
 }
 async function toggleCalendarDelivery(input){

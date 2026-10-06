@@ -93,11 +93,11 @@ async function saveOrder(){
 const invoicePrices={"Mixed Box":{Daily:60,Weekly:360,Monthly:1499},"Medium Box":{Daily:80,Weekly:480,Monthly:1999},"Premium Box":{Daily:100,Weekly:600,Monthly:2499},"Premium Pro Box":{Daily:120,Weekly:720,Monthly:2999}};
 function invoicePlanKey(){const v=document.getElementById("invoicePlan").value;return v.startsWith("Weekly")?"Weekly":v.startsWith("Monthly")?"Monthly":"Daily";}
 function updateInvoiceAmount(){const box=document.getElementById("invoiceBox").value;document.getElementById("invoiceAmount").value=invoicePrices[box][invoicePlanKey()];}
-function invoiceNumber(){const d=new Date();return "E2FIT-"+d.getFullYear()+String(d.getMonth()+1).padStart(2,"0")+String(d.getDate()).padStart(2,"0")+"-"+Math.floor(1000+Math.random()*9000);}
-function generateInvoice(){
+async function invoiceNumber(){const {data,error}=await supabaseClient.rpc("e2fit_next_invoice_number");if(error)throw error;return data;}
+async function generateInvoice(){
   const name=document.getElementById("invoiceCustomer").value.trim(),phone=document.getElementById("invoicePhone").value.trim(),address=document.getElementById("invoiceAddress").value.trim(),box=document.getElementById("invoiceBox").value,plan=document.getElementById("invoicePlan").value,amount=Number(document.getElementById("invoiceAmount").value||0),date=document.getElementById("invoiceDate").value||new Date().toISOString().slice(0,10);
   if(!name){alert("Enter the customer name.");return;}
-  const planKey=invoicePlanKey(),invoiceNo=invoiceNumber();
+  const planKey=invoicePlanKey();let invoiceNo;try{invoiceNo=await invoiceNumber();}catch(error){console.error(error);alert("Could not generate invoice number: "+error.message);return;}
   document.getElementById("invoicePreview").innerHTML=`<div class="invoice-paper"><div class="invoice-brand"><div><img class="invoice-logo-img" src="https://loopifydm.github.io/E2FIT/assets/e2fit-logo.jpg" alt="E2FIT"><small>Fresh. Healthy. Better Every Day.</small></div><div class="invoice-meta"><strong>INVOICE</strong><span>${escapeHtml(invoiceNo)}</span><span>${escapeHtml(date)}</span></div></div><div class="invoice-customer"><div><small>BILL TO</small><strong>${escapeHtml(name)}</strong><span>${escapeHtml(phone)}</span><span>${escapeHtml(address)}</span></div></div><table class="invoice-table"><thead><tr><th>Description</th><th>Plan</th><th class="amount">Amount</th></tr></thead><tbody><tr><td>${escapeHtml(box)}</td><td>${escapeHtml(planKey)}</td><td class="amount">₹${amount.toLocaleString("en-IN")}</td></tr></tbody></table><div class="invoice-total"><span>Total</span><strong>₹${amount.toLocaleString("en-IN")}</strong></div><div class="invoice-footer">Thank you for choosing E2FIT.<br>Gandhi Park, Coimbatore · Free delivery up to 5 km</div></div>`;
 }
 function printInvoice(){

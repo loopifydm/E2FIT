@@ -11,7 +11,8 @@ function closeModal(){modal.classList.remove("open")}
 document.querySelector(".modal-close").addEventListener("click",closeModal);
 document.querySelector(".modal-backdrop").addEventListener("click",closeModal);
 
-function monthlyEndDate(startDate){let d=new Date(startDate+"T00:00:00");let count=0;while(count<26){if(d.getDay()!==0)count++;if(count<26)d.setDate(d.getDate()+1);}return d.toISOString().slice(0,10);}\nfunction getPricing(box,plan){
+function monthlyEndDate(startDate){let d=new Date(startDate+"T00:00:00");let count=0;while(count<26){if(d.getDay()!==0)count++;if(count<26)d.setDate(d.getDate()+1);}return d.toISOString().slice(0,10);}
+function getPricing(box,plan){
   const prices={"Mixed Box":{daily:60,monthly:1499},"Medium Box":{daily:80,monthly:1999},"Premium Box":{daily:100,monthly:2499},"Premium Pro Box":{daily:120,monthly:2999}};
   return plan.startsWith("Monthly")?prices[box].monthly:prices[box].daily;
 }

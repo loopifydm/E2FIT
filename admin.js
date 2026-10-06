@@ -24,7 +24,7 @@ document.getElementById("loginBtn").onclick=async()=>{
   showApp();await refresh();
 };
 document.getElementById("logout").onclick=async()=>{await supabaseClient.auth.signOut();location.reload();};
-async function refresh(){await generateToday();await loadOrders();await loadCustomers();}
+function monthlyEndDate(startDate){let d=new Date(startDate+"T00:00:00");let count=0;while(count<26){if(d.getDay()!==0)count++;if(count<26)d.setDate(d.getDate()+1);}return d.toISOString().slice(0,10);}\nasync function refresh(){await generateToday();await loadOrders();await loadCustomers();}
 async function generateToday(){const {error}=await supabaseClient.rpc("e2fit_generate_today_deliveries");if(error)console.warn("Delivery generation:",error.message);}
 async function loadOrders(){
   const today=new Date().toISOString().slice(0,10);
@@ -55,7 +55,7 @@ document.getElementById("saveOrder").onclick=async()=>{
   try{
     const prices={"Mixed Box":[60,1499],"Medium Box":[80,1999],"Premium Box":[100,2499],"Premium Pro Box":[120,2999]},today=new Date().toISOString().slice(0,10);
     const {data:customer,error:e1}=await supabaseClient.from("e2fit_customers").insert({name,phone,address}).select("id").single();if(e1)throw e1;
-    const {data:subscription,error:e2}=await supabaseClient.from("e2fit_subscriptions").insert({customer_id:customer.id,box,plan,daily_price:prices[box][0],monthly_price:prices[box][1],start_date:today,end_date:plan==="Monthly"?new Date(Date.now()+25*86400000).toISOString().slice(0,10):today,delivery_time:delivery}).select("id").single();if(e2)throw e2;
+    const {data:subscription,error:e2}=await supabaseClient.from("e2fit_subscriptions").insert({customer_id:customer.id,box,plan,daily_price:prices[box][0],monthly_price:prices[box][1],start_date:today,end_date:plan==="Monthly"?monthlyEndDate(today):today,delivery_time:delivery}).select("id").single();if(e2)throw e2;
     const {error:e3}=await supabaseClient.from("e2fit_deliveries").insert({customer_id:customer.id,subscription_id:subscription.id,delivery_date:today,delivery_time:delivery,box,address});if(e3)throw e3;
     modal.classList.add("hidden");document.querySelectorAll("#orderModal input").forEach(i=>i.value="");await refresh();
   }catch(error){alert("Could not save order: "+error.message);}finally{button.disabled=false;button.textContent="Save Order";}

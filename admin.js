@@ -172,10 +172,17 @@ function render(){
   document.getElementById("preparing").textContent=orders.filter(o=>o.status==="Preparing").length;
   document.getElementById("out").textContent=orders.filter(o=>o.status==="Out for Delivery").length;
   document.getElementById("delivered").textContent=orders.filter(o=>o.status==="Delivered").length;
-  document.getElementById("orders").innerHTML=visible.map(o=>{const c=o.e2fit_customers||{},next=o.status==="Pending"?"Preparing":o.status==="Preparing"?"Out for Delivery":o.status==="Out for Delivery"?"Delivered":null;return `<div class="order"><div class="customer"><strong>${escapeHtml(c.name||"Customer")}</strong><small>${escapeHtml(c.phone||"")} · ${escapeHtml(o.address||c.address||"")}</small></div><div><strong>${escapeHtml(o.box)}</strong><div class="muted">${escapeHtml(o.delivery_time)}</div></div><div><strong>${escapeHtml(o.status)}</strong><div class="muted">${escapeHtml(o.delivery_date)}</div></div><div class="status-action"><span class="pill ${statusClass(o.status)}">${escapeHtml(o.status)}</span> ${next?`<button class="status-btn" onclick="advance('${o.id}','${next}')">Next →</button>`:""}</div></div>`;}).join("")||"<div style='padding:30px;color:#879189'>No deliveries found.</div>";
+  document.getElementById("orders").innerHTML=visible.map(o=>{const c=o.e2fit_customers||{},next=o.status==="Pending"?"Preparing":o.status==="Preparing"?"Out for Delivery":o.status==="Out for Delivery"?"Delivered":null;return `<div class="order"><div class="customer"><strong>${escapeHtml(c.name||"Customer")}</strong><small>${escapeHtml(c.phone||"")} · ${escapeHtml(o.address||c.address||"")}</small></div><div><strong>${escapeHtml(o.box)}</strong><div class="muted">${escapeHtml(o.delivery_time)}</div></div><div><strong>${escapeHtml(o.status)}</strong><div class="muted">${escapeHtml(o.delivery_date)}</div></div><div class="status-action"><span class="pill ${statusClass(o.status)}">${escapeHtml(o.status)}</span> ${next?`<button class="status-btn" onclick="advance('${o.id}','${next}')">Next →</button>`:""} <button class="status-btn delete-delivery-btn" onclick="deleteTodayDelivery('${o.id}')">Delete</button></div></div>`;}).join("")||"<div style='padding:30px;color:#879189'>No deliveries found.</div>";
 }
 function statusClass(status){return status==="Out for Delivery"?"Out":status.replaceAll(" ","");}
 async function advance(id,next){const {error}=await supabaseClient.from("e2fit_deliveries").update({status:next,updated_at:new Date().toISOString()}).eq("id",id);if(error){alert("Could not update delivery: "+error.message);return;}await loadOrders();}
+async function deleteTodayDelivery(id){
+  if(!id||!confirm("Delete this delivery from Today's Deliveries?\n\nThis will remove only today's delivery record. The subscriber and invoice will not be deleted."))return;
+  const {error}=await supabaseClient.from("e2fit_deliveries").delete().eq("id",id);
+  if(error){alert("Could not delete delivery: "+error.message);return;}
+  await loadOrders();
+  await loadSubscriberCalendarOptions();
+}
 async function deleteCustomer(id){if(!id||!confirm("Delete this customer and all their subscriptions and deliveries?"))return;const {error}=await supabaseClient.from("e2fit_customers").delete().eq("id",id);if(error){alert("Could not delete customer: "+error.message);return;}await refresh();}
 
 document.getElementById("filter").addEventListener("change",render);

@@ -79,9 +79,21 @@ let subscriptions=[];
 function monthValue(d){return String(d||"").slice(0,7)}
 function calendarMonthValue(date){return String(date||"").slice(0,7);}
 
-function subscriberTargetDays(plan){return plan==="Monthly"?26:plan==="Weekly"?6:1;}
-function subscriberEffectiveEnd(startDate,plan,records){
-  const target=subscriberTargetDays(plan);
+function subscriberTargetDays(plan,startDate,endDate){
+  if(plan==="Monthly")return 26;
+  if(plan==="Weekly")return 6;
+  if(plan==="Trial")return nonSundayDaysBetween(startDate,endDate||startDate);
+  return 1;
+}
+function nonSundayDaysBetween(startDate,endDate){
+  if(!startDate||!endDate||endDate<startDate)return 0;
+  let d=new Date(startDate+"T12:00:00Z"),last=new Date(endDate+"T12:00:00Z"),count=0;
+  while(d<=last){if(d.getUTCDay()!==0)count++;d.setUTCDate(d.getUTCDate()+1);}
+  return count;
+}
+function subscriberEffectiveEnd(startDate,plan,records,customEndDate){
+  if(plan==="Trial")return customEndDate||startDate;
+  const target=subscriberTargetDays(plan,startDate,customEndDate);
   const missed=(records||[]).filter(r=>r.delivery_date>=startDate && r.status!=="Delivered" && new Date(r.delivery_date+"T12:00:00Z").getUTCDay()!==0).length;
   let d=new Date(startDate+"T12:00:00Z"),needed=target+missed,count=0;
   while(count<needed){
@@ -96,7 +108,7 @@ async function renderSubscriberCalendar(){
   const box=document.getElementById("subscriberCalendar");
   if(!sub){box.innerHTML='<div class="calendar-empty">Select a subscriber to view their delivery calendar.</div>';return;}
 
-  const targetDays=subscriberTargetDays(sub.plan);
+  const targetDays=subscriberTargetDays(sub.plan,sub.start_date,sub.end_date);
   let monthValue=month||calendarMonthValue(sub.start_date);
   if(!monthValue)monthValue=new Date().toISOString().slice(0,7);
   document.getElementById("calendarMonth").value=monthValue;
@@ -104,7 +116,7 @@ async function renderSubscriberCalendar(){
   const {data:allRecords,error}=await supabaseClient.from("e2fit_deliveries").select("id,delivery_date,status").eq("subscription_id",sub.id).gte("delivery_date",sub.start_date).order("delivery_date",{ascending:true});
   if(error){console.error(error);box.innerHTML='<div class="calendar-empty">Could not load delivery calendar.</div>';return;}
 
-  const records=allRecords||[],effectiveEnd=subscriberEffectiveEnd(sub.start_date,sub.plan,records),byDate={};
+  const records=allRecords||[],effectiveEnd=subscriberEffectiveEnd(sub.start_date,sub.plan,records,sub.end_date),byDate={};
   records.forEach(r=>{if(new Date(r.delivery_date+"T12:00:00Z").getUTCDay()!==0)byDate[r.delivery_date]=r;});
 
   const monthStart=monthValue+"-01",monthEnd=new Date(Number(monthValue.slice(0,4)),Number(monthValue.slice(5,7)),0).toISOString().slice(0,10);
@@ -140,12 +152,14 @@ async function toggleCalendarDelivery(input){
   else result=await supabaseClient.from("e2fit_deliveries").insert(payload).select("id").single();
   if(result.error){alert("Could not save delivery status: "+result.error.message);input.checked=!input.checked;return;}
 
-  // Recalculate the real subscription end: 26 monthly or 6 weekly boxes,
-  // with every explicitly not-brought day carried forward.
-  const {data:records,error:recordError}=await supabaseClient.from("e2fit_deliveries").select("delivery_date,status").eq("subscription_id",sub.id).gte("delivery_date",sub.start_date);
-  if(!recordError){
-    const effectiveEnd=subscriberEffectiveEnd(sub.start_date,sub.plan,records||[]);
-    await supabaseClient.from("e2fit_subscriptions").update({end_date:effectiveEnd,updated_at:new Date().toISOString()}).eq("id",sub.id);
+  // Monthly/Weekly plans carry forward missed days. Trial plans keep the
+  // custom end date entered on the invoice and do not auto-extend.
+  if(sub.plan!=="Trial"){
+    const {data:records,error:recordError}=await supabaseClient.from("e2fit_deliveries").select("delivery_date,status").eq("subscription_id",sub.id).gte("delivery_date",sub.start_date);
+    if(!recordError){
+      const effectiveEnd=subscriberEffectiveEnd(sub.start_date,sub.plan,records||[],sub.end_date);
+      await supabaseClient.from("e2fit_subscriptions").update({end_date:effectiveEnd,updated_at:new Date().toISOString()}).eq("id",sub.id);
+    }
   }
   await renderSubscriberCalendar();
   await loadSubscriptions();
@@ -168,7 +182,7 @@ document.getElementById("filter").addEventListener("change",render);
 document.getElementById("enquiryFilter")?.addEventListener("change",loadEnquiries);
 document.getElementById("calendarSubscriber")?.addEventListener("change",()=>{const sub=(window.e2fitCalendarSubscriptions||[]).find(s=>s.id===document.getElementById("calendarSubscriber").value);if(sub)document.getElementById("calendarMonth").value=calendarMonthValue(sub.start_date);renderSubscriberCalendar();});
 document.getElementById("calendarMonth")?.addEventListener("change",renderSubscriberCalendar);
-const invoicePrices={"Mixed Box":{Daily:60,Weekly:360,Monthly:1499},"Medium Box":{Daily:80,Weekly:480,Monthly:1999},"Premium Box":{Daily:100,Weekly:600,Monthly:2499},"Premium Pro Box":{Daily:120,Weekly:720,Monthly:2999}};
+const invoicePrices={"Mixed Box":{Daily:60,Weekly:360,Monthly:1499,Trial:0},"Medium Box":{Daily:80,Weekly:480,Monthly:1999,Trial:0},"Premium Box":{Daily:100,Weekly:600,Monthly:2499,Trial:0},"Premium Pro Box":{Daily:120,Weekly:720,Monthly:2999,Trial:0}};
 async function loadInvoices(){
   const {data,error}=await supabaseClient.from("e2fit_invoices").select("*").order("created_at",{ascending:false});
   if(error){console.error(error);return;}
@@ -178,7 +192,7 @@ let editingInvoiceId=null,editingInvoiceNumber=null;
 async function editInvoice(id){
   const {data,error}=await supabaseClient.from("e2fit_invoices").select("*").eq("id",id).single();if(error){alert(error.message);return;}
   editingInvoiceId=id;editingInvoiceNumber=data.invoice_number;
-  document.getElementById("invoiceCustomer").value=data.customer_name||"";document.getElementById("invoicePhone").value=data.phone||"";document.getElementById("invoiceAddress").value=data.address||"";document.getElementById("invoiceBox").value=data.box||"Mixed Box";document.getElementById("invoicePlan").value=data.plan==="Weekly"?"Weekly (6 days)":data.plan==="Monthly"?"Monthly (26 days)":"Daily";document.getElementById("invoiceDeliveryTime").value=data.delivery_time||"Breakfast";document.getElementById("invoiceAmount").value=data.amount;document.getElementById("invoiceStartDate").value=data.start_date||data.invoice_date;document.getElementById("invoiceEndDate").value=data.end_date||data.invoice_date;document.getElementById("invoiceAdvance").value=data.advance_amount||0;document.getElementById("invoiceBalance").value=data.balance_amount??Math.max(0,Number(data.amount||0)-Number(data.advance_amount||0));updateInvoiceBalance();document.getElementById("invoiceDate").value=data.invoice_date;updateInvoiceAmount();
+  document.getElementById("invoiceCustomer").value=data.customer_name||"";document.getElementById("invoicePhone").value=data.phone||"";document.getElementById("invoiceAddress").value=data.address||"";document.getElementById("invoiceBox").value=data.box||"Mixed Box";document.getElementById("invoicePlan").value=data.plan==="Weekly"?"Weekly (6 days)":data.plan==="Monthly"?"Monthly (26 days)":data.plan==="Trial"?"Trial (Custom Dates)":"Daily";document.getElementById("invoiceDeliveryTime").value=data.delivery_time||"Breakfast";document.getElementById("invoiceAmount").value=data.amount;document.getElementById("invoiceStartDate").value=data.start_date||data.invoice_date;document.getElementById("invoiceEndDate").value=data.end_date||data.invoice_date;document.getElementById("invoiceAdvance").value=data.advance_amount||0;document.getElementById("invoiceBalance").value=data.balance_amount??Math.max(0,Number(data.amount||0)-Number(data.advance_amount||0));updateInvoiceBalance();document.getElementById("invoiceDate").value=data.invoice_date;updateInvoiceAmount();
   document.getElementById("generateInvoice").textContent="Update Invoice";document.getElementById("invoices").scrollIntoView({behavior:"smooth"});await renderInvoice(data.invoice_number);
 }
 async function renderInvoice(invoiceNoOverride){
@@ -190,10 +204,10 @@ async function renderInvoice(invoiceNoOverride){
 async function deleteInvoice(id){if(!confirm("Delete this invoice and its linked subscriber? This cannot be undone."))return;const {data:inv,error:invError}=await supabaseClient.from("e2fit_invoices").select("id").eq("id",id).single();if(invError){alert(invError.message);return;}const {data:sub,error:subError}=await supabaseClient.from("e2fit_subscriptions").select("id,customer_id").eq("invoice_id",id).maybeSingle();if(subError){alert(subError.message);return;}if(sub){await supabaseClient.from("e2fit_deliveries").delete().eq("subscription_id",sub.id);await supabaseClient.from("e2fit_subscriptions").delete().eq("id",sub.id);const {data:other}=await supabaseClient.from("e2fit_subscriptions").select("id").eq("customer_id",sub.customer_id).limit(1);if(!other?.length)await supabaseClient.from("e2fit_customers").delete().eq("id",sub.customer_id);}const {error}=await supabaseClient.from("e2fit_invoices").delete().eq("id",id);if(error){alert("Could not delete invoice: "+error.message);return;}if(editingInvoiceId===id){editingInvoiceId=null;editingInvoiceNumber=null;}await loadInvoices();}
 async function printSavedInvoice(id){await editInvoice(id);setTimeout(()=>printInvoice(),200);}
 
-function invoicePlanKey(){const v=document.getElementById("invoicePlan").value;return v.startsWith("Weekly")?"Weekly":v.startsWith("Monthly")?"Monthly":"Daily";}
-function planEndDate(startDate,plan){if(!startDate)return "";if(plan==="Daily")return startDate;let d=new Date(startDate+"T00:00:00"),count=0,target=plan==="Weekly"?6:26;while(count<target){if(d.getDay()!==0)count++;if(count<target)d.setDate(d.getDate()+1);}return d.toISOString().slice(0,10);}
-function updateInvoicePlanDates(){const start=document.getElementById("invoiceStartDate"),end=document.getElementById("invoiceEndDate");if(!start||!end)return;if(!start.value)start.value=new Date().toISOString().slice(0,10);end.value=planEndDate(start.value,invoicePlanKey());}
-function updateInvoiceAmount(){const box=document.getElementById("invoiceBox").value;document.getElementById("invoiceAmount").value=invoicePrices[box][invoicePlanKey()];updateInvoiceBalance();}document.getElementById("invoicePaid")?.addEventListener("change",()=>updateInvoiceBalance());function updateInvoiceBalance(){const total=Number(document.getElementById("invoiceAmount").value||0),paid=document.getElementById("invoicePaid")?.checked||false,advance=paid?total:Number(document.getElementById("invoiceAdvance").value||0);document.getElementById("invoiceAdvance").value=advance;document.getElementById("invoiceBalance").value=Math.max(0,total-advance);}
+function invoicePlanKey(){const v=document.getElementById("invoicePlan").value;return v.startsWith("Weekly")?"Weekly":v.startsWith("Monthly")?"Monthly":v.startsWith("Trial")?"Trial":"Daily";}
+function planEndDate(startDate,plan){if(!startDate)return "";if(plan==="Daily"||plan==="Trial")return startDate;let d=new Date(startDate+"T00:00:00"),count=0,target=plan==="Weekly"?6:26;while(count<target){if(d.getDay()!==0)count++;if(count<target)d.setDate(d.getDate()+1);}return d.toISOString().slice(0,10);}
+function updateInvoicePlanDates(){const start=document.getElementById("invoiceStartDate"),end=document.getElementById("invoiceEndDate");if(!start||!end)return;if(!start.value)start.value=new Date().toISOString().slice(0,10);const plan=invoicePlanKey();if(plan==="Trial"){if(!end.value||end.value<start.value)end.value=start.value;return;}end.value=planEndDate(start.value,plan);}
+function updateInvoiceAmount(){const box=document.getElementById("invoiceBox").value,plan=invoicePlanKey(),amount=document.getElementById("invoiceAmount");if(plan!=="Trial"){amount.value=invoicePrices[box][plan];}else if(amount.value===""){amount.value="0";}updateInvoiceBalance();}document.getElementById("invoicePaid")?.addEventListener("change",()=>updateInvoiceBalance());function updateInvoiceBalance(){const total=Number(document.getElementById("invoiceAmount").value||0),paid=document.getElementById("invoicePaid")?.checked||false,advance=paid?total:Number(document.getElementById("invoiceAdvance").value||0);document.getElementById("invoiceAdvance").value=advance;document.getElementById("invoiceBalance").value=Math.max(0,total-advance);}
 async function invoiceNumber(){const {data,error}=await supabaseClient.rpc("e2fit_next_invoice_number");if(error)throw error;return data;}
 async function syncSubscriberFromInvoice(invoiceId,invoiceData){
   let customerId=null;
@@ -212,7 +226,7 @@ async function syncSubscriberFromInvoice(invoiceId,invoiceData){
     if(error)throw error;
   }
   const prices=invoicePrices[invoiceData.box];
-  const subscriptionPayload={customer_id:customerId,invoice_id:invoiceId,box:invoiceData.box,plan:invoiceData.plan,daily_price:prices.Daily,monthly_price:invoiceData.amount,start_date:invoiceData.start_date,end_date:invoiceData.end_date,delivery_time:invoiceData.delivery_time,status:"active",updated_at:new Date().toISOString()};
+  const subscriptionPayload={customer_id:customerId,invoice_id:invoiceId,box:invoiceData.box,plan:invoiceData.plan,daily_price:invoiceData.plan==="Trial"?invoiceData.amount:prices.Daily,monthly_price:invoiceData.amount,start_date:invoiceData.start_date,end_date:invoiceData.end_date,delivery_time:invoiceData.delivery_time,status:"active",updated_at:new Date().toISOString()};
   const {data:existing,error:findError}=await supabaseClient.from("e2fit_subscriptions").select("id").eq("invoice_id",invoiceId).maybeSingle();
   if(findError)throw findError;
   let subscriptionId=existing?.id;

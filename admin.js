@@ -57,15 +57,34 @@ async function advance(id,next){const {error}=await supabaseClient.from("e2fit_d
 document.getElementById("filter").onchange=render;
 const modal=document.getElementById("orderModal");document.getElementById("newOrder").onclick=()=>modal.classList.remove("hidden");document.getElementById("closeModal").onclick=()=>modal.classList.add("hidden");
 document.getElementById("saveOrder").onclick=async()=>{
-  const button=document.getElementById("saveOrder"),name=document.getElementById("name").value.trim(),phone=document.getElementById("phone").value.trim(),box=document.getElementById("box").value,plan=document.getElementById("plan").value,delivery=document.getElementById("delivery").value,address=document.getElementById("address").value.trim();
-  if(!name||!phone||!address){alert("Name, phone and address are required.");return;}button.disabled=true;button.textContent="Saving…";
+  const button=document.getElementById("saveOrder");
+  const fields={
+    name:document.getElementById("name"),
+    phone:document.getElementById("phone"),
+    box:document.getElementById("box"),
+    plan:document.getElementById("plan"),
+    delivery:document.getElementById("delivery"),
+    address:document.getElementById("address")
+  };
+  if(Object.values(fields).some(el=>!el)){alert("Order form is not loaded correctly. Please refresh the page.");return;}
+  const name=fields.name.value.trim(),phone=fields.phone.value.trim(),box=fields.box.value,plan=fields.plan.value,delivery=fields.delivery.value,address=fields.address.value.trim();
+  if(!name||!phone||!address){alert("Name, phone and address are required.");return;}
+  button.disabled=true;button.textContent="Saving…";
   try{
-    const prices={"Mixed Box":[60,1499],"Medium Box":[80,1999],"Premium Box":[100,2499],"Premium Pro Box":[120,2999]},today=new Date().toISOString().slice(0,10);
-    const {data:customer,error:e1}=await supabaseClient.from("e2fit_customers").insert({name,phone,address}).select("id").single();if(e1)throw e1;
-    const {data:subscription,error:e2}=await supabaseClient.from("e2fit_subscriptions").insert({customer_id:customer.id,box,plan,daily_price:prices[box][0],monthly_price:prices[box][1],start_date:today,end_date:plan==="Monthly"?monthlyEndDate(today):today,delivery_time:delivery}).select("id").single();if(e2)throw e2;
-    const {error:e3}=await supabaseClient.from("e2fit_deliveries").insert({customer_id:customer.id,subscription_id:subscription.id,delivery_date:today,delivery_time:delivery,box,address});if(e3)throw e3;
-    modal.classList.add("hidden");document.querySelectorAll("#orderModal input").forEach(i=>i.value="");await refresh();
-  }catch(error){alert("Could not save order: "+error.message);}finally{button.disabled=false;button.textContent="Save Order";}
+    const prices={"Mixed Box":[60,1499],"Medium Box":[80,1999],"Premium Box":[100,2499],"Premium Pro Box":[120,2999]};
+    const today=new Date().toISOString().slice(0,10);
+    const {data:customer,error:e1}=await supabaseClient.from("e2fit_customers").insert({name,phone,address}).select("id").single();
+    if(e1)throw e1;
+    if(!customer?.id)throw new Error("Customer record was not created.");
+    const {data:subscription,error:e2}=await supabaseClient.from("e2fit_subscriptions").insert({customer_id:customer.id,box,plan,daily_price:prices[box][0],monthly_price:prices[box][1],start_date:today,end_date:plan==="Monthly"?monthlyEndDate(today):today,delivery_time:delivery}).select("id").single();
+    if(e2)throw e2;
+    if(!subscription?.id)throw new Error("Subscription record was not created.");
+    const {error:e3}=await supabaseClient.from("e2fit_deliveries").insert({customer_id:customer.id,subscription_id:subscription.id,delivery_date:today,delivery_time:delivery,box,address});
+    if(e3)throw e3;
+    modal.classList.add("hidden");
+    [fields.name,fields.phone,fields.address].forEach(i=>i.value="");
+    await refresh();
+  }catch(error){console.error("E2FIT admin order error:",error);alert("Could not save order: "+(error?.message||"Unknown error"));}finally{button.disabled=false;button.textContent="Save Order";}
 };
 function escapeHtml(value){return String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]));}
 document.querySelectorAll("aside nav a").forEach(a=>a.addEventListener("click",e=>{e.preventDefault();const target=document.querySelector(a.getAttribute("href"));if(target){document.querySelectorAll("aside nav a").forEach(x=>x.classList.remove("active"));a.classList.add("active");target.scrollIntoView({behavior:"smooth",block:"start"});}}));

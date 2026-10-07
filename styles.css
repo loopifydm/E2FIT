@@ -175,3 +175,19 @@ body{font-weight:500;color:#183b29}
   .box-content p{font-size:14px}
   .step p,.ingredient-list small{font-size:13px}
 }
+
+
+/* Larger header & footer text */
+.nav{font-size:15px}
+.nav-cta{font-size:15px}
+.footer>div{font-size:14px}
+.footer b{font-size:13px}
+.footer a,.footer span,.footer p{font-size:14px}
+.copyright{font-size:12px}
+@media(max-width:650px){
+  .nav{font-size:15px}
+  .footer>div{font-size:14px}
+  .footer b{font-size:13px}
+  .footer a,.footer span,.footer p{font-size:14px}
+  .copyright{font-size:12px}
+}

@@ -39,7 +39,7 @@ document.getElementById("logout").addEventListener("click",async()=>{await supab
 
 function monthlyEndDate(startDate){let d=new Date(startDate+"T00:00:00"),count=0;while(count<26){if(d.getDay()!==0)count++;if(count<26)d.setDate(d.getDate()+1);}return d.toISOString().slice(0,10);}
 function weeklyEndDate(startDate){let d=new Date(startDate+"T00:00:00"),count=0;while(count<6){if(d.getDay()!==0)count++;if(count<6)d.setDate(d.getDate()+1);}return d.toISOString().slice(0,10);}
-async function refresh(){await generateToday();await loadEnquiries();await loadOrders();await loadCustomers();await loadSubscriptions();await loadSubscriberCalendarOptions();await loadInvoices();}
+async function refresh(){await generateToday();await loadEnquiries();await loadOrders();await loadCustomers();await loadSubscriptions();await loadSubscriberCalendarOptions();await loadInvoices();await loadPurchases();}
 async function loadEnquiries(){
   const {data,error}=await supabaseClient.from("e2fit_enquiries").select("*").order("created_at",{ascending:false});
   if(error){console.error(error);return;}
@@ -463,3 +463,55 @@ updateInvoiceAmount();updateInvoicePlanDates();
 function escapeHtml(value){return String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]));}
 document.querySelectorAll("aside nav a").forEach(a=>a.addEventListener("click",e=>{e.preventDefault();const target=document.querySelector(a.getAttribute("href"));if(target){document.querySelectorAll("aside nav a").forEach(x=>x.classList.remove("active"));a.classList.add("active");target.scrollIntoView({behavior:"smooth",block:"start"});}}));
 boot();
+
+async function loadPurchases(){
+  const {data,error}=await supabaseClient.from("e2fit_purchases").select("*").order("purchase_date",{ascending:false}).order("created_at",{ascending:false});
+  if(error){console.error(error);return;}
+  const rows=document.getElementById("purchaseRows");
+  if(rows) rows.innerHTML=(data||[]).map(p=>`<tr>
+    <td>${escapeHtml(p.purchase_date)}</td>
+    <td><strong>${escapeHtml(p.item_name)}</strong></td>
+    <td>${Number(p.quantity).toLocaleString("en-IN")}</td>
+    <td>₹${Number(p.unit_price||0).toLocaleString("en-IN")}</td>
+    <td><strong>₹${Number(p.total_amount||0).toLocaleString("en-IN")}</strong></td>
+    <td><button class="status-btn" onclick="deletePurchase('${p.id}')">Delete</button></td>
+  </tr>`).join("")||"<tr><td colspan='6'>No purchases recorded yet.</td></tr>";
+
+  const purchaseTotal=(data||[]).reduce((sum,p)=>sum+Number(p.total_amount||0),0);
+  const {data:invoices,error:invoiceError}=await supabaseClient.from("e2fit_invoices").select("amount,balance_amount");
+  if(invoiceError){console.error(invoiceError);return;}
+  const subscriptionTotal=(invoices||[]).reduce((sum,i)=>sum+Number(i.amount||0),0);
+  const revenueTotal=(invoices||[]).reduce((sum,i)=>sum+Math.max(0,Number(i.amount||0)-Number(i.balance_amount||0)),0);
+  const profitTotal=revenueTotal-purchaseTotal;
+  const money=v=>"₹"+Number(v||0).toLocaleString("en-IN");
+  document.getElementById("purchaseTotal").textContent=money(purchaseTotal);
+  document.getElementById("subscriptionTotal").textContent=money(subscriptionTotal);
+  document.getElementById("revenueTotal").textContent=money(revenueTotal);
+  document.getElementById("profitTotal").textContent=money(profitTotal);
+}
+
+async function addPurchase(){
+  const date=document.getElementById("purchaseDate").value||new Date().toISOString().slice(0,10);
+  const item=document.getElementById("purchaseItem").value.trim();
+  const quantity=Number(document.getElementById("purchaseQuantity").value||0);
+  const price=Number(document.getElementById("purchasePrice").value||0);
+  if(!item){alert("Enter the item name.");return;}
+  if(quantity<=0){alert("Enter a valid quantity.");return;}
+  if(price<0){alert("Enter a valid price.");return;}
+  const {error}=await supabaseClient.from("e2fit_purchases").insert({purchase_date:date,item_name:item,quantity,unit_price:price});
+  if(error){alert("Could not add purchase: "+error.message);return;}
+  document.getElementById("purchaseItem").value="";
+  document.getElementById("purchaseQuantity").value="";
+  document.getElementById("purchasePrice").value="";
+  await loadPurchases();
+}
+
+async function deletePurchase(id){
+  if(!confirm("Delete this purchase record? This cannot be undone."))return;
+  const {error}=await supabaseClient.from("e2fit_purchases").delete().eq("id",id);
+  if(error){alert("Could not delete purchase: "+error.message);return;}
+  await loadPurchases();
+}
+
+document.getElementById("purchaseDate").value=new Date().toISOString().slice(0,10);
+document.getElementById("addPurchase").addEventListener("click",addPurchase);

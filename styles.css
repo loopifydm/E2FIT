@@ -115,3 +115,16 @@ body{font-family:"DM Sans",sans-serif;-webkit-font-smoothing:antialiased}
   .section{padding:78px 20px}
   .statement,.ingredients{padding-top:78px;padding-bottom:78px}
 }
+
+
+/* Premium food photography */
+.hero-image{overflow:hidden;position:relative}
+.hero-image img{width:100%;height:100%;display:block;object-fit:cover;object-position:center}
+.box-art{position:relative;overflow:hidden}
+.box-art img{width:100%;height:100%;display:block;object-fit:cover;transition:transform .45s ease,filter .45s ease}
+.box-card:hover .box-art img{transform:scale(1.06)}
+.box-art:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,0) 55%,rgba(23,63,43,.08));pointer-events:none}
+.ingredient-image{overflow:hidden;background:#e8efdc}
+.ingredient-image>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center}
+.ingredient-image:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(23,74,42,0) 50%,rgba(23,74,42,.16));pointer-events:none}
+.ingredient-badge{z-index:2}

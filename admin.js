@@ -472,7 +472,7 @@ async function loadPurchases(){
     <td>${escapeHtml(p.purchase_date)}</td>
     <td><strong>${escapeHtml(p.item_name)}</strong></td>
     <td>${Number(p.quantity).toLocaleString("en-IN")}</td><td>${escapeHtml(p.unit||"kg")}</td>
-    <td>₹${Number(p.unit_price||0).toLocaleString("en-IN")}</td>
+    <td>₹${Number(p.purchase_price||0).toLocaleString("en-IN")}</td>
     <td><strong>₹${Number(p.total_amount||0).toLocaleString("en-IN")}</strong></td>
     <td><button class="status-btn" onclick="deletePurchase('${p.id}')">Delete</button></td>
   </tr>`).join("")||"<tr><td colspan='6'>No purchases recorded yet.</td></tr>";
@@ -498,7 +498,7 @@ async function addPurchase(){
   if(!item){alert("Enter the item name.");return;}
   if(quantity<=0){alert("Enter a valid quantity.");return;}
   if(price<0){alert("Enter a valid price.");return;}
-  const {error}=await supabaseClient.from("e2fit_purchases").insert({purchase_date:date,item_name:item,quantity,unit,unit_price:price});
+  const {error}=await supabaseClient.from("e2fit_purchases").insert({purchase_date:date,item_name:item,quantity,unit,purchase_price:price});
   if(error){alert("Could not add purchase: "+error.message);return;}
   document.getElementById("purchaseItem").value="";
   document.getElementById("purchaseQuantity").value="";

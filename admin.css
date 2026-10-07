@@ -7,7 +7,10 @@
 .finance-stats strong{display:block;font:800 27px Manrope;margin-top:8px;color:#173f2b}
 .purchase-form{display:grid;grid-template-columns:1fr 1.5fr .8fr .9fr .9fr auto;gap:12px;padding:20px 25px;border-bottom:1px solid #edf0e9;align-items:end}
 .purchase-form label{font-size:11px;font-weight:800;color:#657269}
-.purchase-form input{display:block;width:100%;padding:12px;margin-top:6px;border:1px solid #dfe4d9;border-radius:10px;background:#fbfcf9;color:#173f2b;font:500 12px "DM Sans",sans-serif;outline:none}
+.purchase-form input,.purchase-form select{display:block;width:100%;min-width:0;box-sizing:border-box;padding:12px;margin-top:6px;border:1px solid #dfe4d9;border-radius:10px;background:#fbfcf9;color:#173f2b;font:500 12px "DM Sans",sans-serif;outline:none;height:42px}
+.purchase-form select{padding-right:30px;cursor:pointer}
+.purchase-form label:nth-child(3){min-width:0}
+.purchase-form label:nth-child(4){min-width:0}
 .purchase-form input:focus{border-color:#9ccf4a;box-shadow:0 0 0 3px #9ccf4a22}
 .purchase-form .new-order{white-space:nowrap;height:42px}
 @media(max-width:1000px){

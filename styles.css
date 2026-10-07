@@ -128,3 +128,50 @@ body{font-family:"DM Sans",sans-serif;-webkit-font-smoothing:antialiased}
 .ingredient-image>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center}
 .ingredient-image:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(23,74,42,0) 50%,rgba(23,74,42,.16));pointer-events:none}
 .ingredient-badge{z-index:2}
+
+
+/* Improved font visibility & readability */
+body{font-weight:500;color:#183b29}
+.nav{font-weight:700;color:#355543}
+.nav a{font-weight:700}
+.hero h1{font-weight:800;color:#123a25;text-shadow:0 1px 0 rgba(255,255,255,.35)}
+.hero-copy>p{font-size:18px;font-weight:500;line-height:1.75;color:#435f4e}
+.trust-row{font-size:13px;font-weight:700;color:#4b6655}
+.eyebrow{font-size:12px;font-weight:800;letter-spacing:2px;color:#2f6b3f}
+.statement h2,.section h2,.ingredients h2,.delivery h2,.cta h2{font-weight:800;color:inherit}
+.statement p{font-size:18px;font-weight:500;color:#d6e1d9}
+.section-note{font-size:14px;font-weight:800}
+.box-content h3{font-weight:800;color:#173f2b}
+.box-content p{font-size:14px;font-weight:500;color:#52695b}
+.dark-card .box-content h3,.dark-card .price,.dark-card .tag{color:#fff}
+.dark-card .box-content p{color:#d0ddd3}
+.price{font-weight:800;color:#173f2b}
+.plan-price{font-size:12px;font-weight:600;color:#53665a}
+.plan-price strong{font-size:17px;font-weight:800;color:#173f2b}
+.dark-card .plan-price strong{color:#fff}
+.select-btn{font-size:13px;font-weight:800;color:#173f2b}
+.ingredient-copy>p{font-size:18px;font-weight:500;color:#4d6455}
+.ingredient-list strong{font-size:15px;font-weight:800;color:#234532}
+.ingredient-list small{font-size:13px;font-weight:500;color:#5f7065}
+.step h3{font-size:21px;font-weight:800;color:#173f2b}
+.step p{font-size:14px;font-weight:500;color:#52665a}
+.delivery>div:first-child p{font-size:17px;font-weight:500;color:#4d6455}
+.delivery-points span{font-size:12px;font-weight:800}
+.delivery-card h3{font-size:26px;font-weight:800}
+.delivery-card p{font-size:14px;font-weight:500;color:#d1ddd4}
+.cta p{font-size:16px;font-weight:600;color:#36573f}
+.footer a,.footer span,.footer p{font-weight:500;color:#c7d5cb}
+.footer b{font-weight:800}
+.modal-card h2{font-weight:800;color:#173f2b}
+.modal-card>p{font-size:14px;font-weight:500;color:#52665a}
+.modal-card label{font-size:12px;font-weight:800;color:#435b4c}
+.modal-card input,.modal-card select{font-size:14px;font-weight:500;color:#183b29}
+.btn,.nav-cta{font-weight:800}
+@media(max-width:650px){
+  .hero h1{font-size:48px;line-height:.98}
+  .hero-copy>p{font-size:17px}
+  .section h2,.ingredients h2,.delivery h2,.cta h2{font-size:36px}
+  .statement h2{font-size:36px}
+  .box-content p{font-size:14px}
+  .step p,.ingredient-list small{font-size:13px}
+}

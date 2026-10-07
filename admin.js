@@ -473,48 +473,55 @@ async function loadStock(){
   if(purchaseError){console.error(purchaseError);return;}
   if(usageError){console.error(usageError);return;}
   const map=new Map();
+  const toGrams=(qty,unit)=>unit==="kg"?Number(qty||0)*1000:unit==="gram"?Number(qty||0):null;
   (purchases||[]).forEach(p=>{
-    const unit=p.unit||"kg", key=p.item_name.trim().toLowerCase()+"|"+unit;
-    if(!map.has(key))map.set(key,{item:p.item_name,unit,purchased:0,used:0});
-    map.get(key).purchased+=Number(p.quantity||0);
+    const grams=toGrams(p.quantity,p.unit);
+    if(grams===null)return;
+    const key=p.item_name.trim().toLowerCase();
+    if(!map.has(key))map.set(key,{item:p.item_name,purchased:0,used:0});
+    map.get(key).purchased+=grams;
   });
   (usage||[]).forEach(u=>{
-    const unit=u.unit||"kg", key=u.item_name.trim().toLowerCase()+"|"+unit;
-    if(!map.has(key))map.set(key,{item:u.item_name,unit,purchased:0,used:0});
-    map.get(key).used+=Number(u.quantity||0);
+    const grams=toGrams(u.quantity,u.unit);
+    if(grams===null)return;
+    const key=u.item_name.trim().toLowerCase();
+    if(!map.has(key))map.set(key,{item:u.item_name,purchased:0,used:0});
+    map.get(key).used+=grams;
   });
   const rows=document.getElementById("stockRows");
   const entries=[...map.values()].sort((a,b)=>a.item.localeCompare(b.item));
   if(rows) rows.innerHTML=entries.map(s=>{
     const remaining=s.purchased-s.used;
-    return `<tr><td><strong>${escapeHtml(s.item)}</strong></td><td>${escapeHtml(s.unit)}</td><td>${s.purchased.toLocaleString("en-IN")}</td><td>${s.used.toLocaleString("en-IN")}</td><td><strong class="${remaining<0?"stock-negative":"stock-positive"}">${remaining.toLocaleString("en-IN")}</strong></td><td><button class="status-btn" onclick="showStockUsageHistory('${escapeHtml(s.item)}','${escapeHtml(s.unit)}')">Usage</button></td></tr>`;
+    return `<tr><td><strong>${escapeHtml(s.item)}</strong></td><td>gram</td><td>${s.purchased.toLocaleString("en-IN")} g</td><td>${s.used.toLocaleString("en-IN")} g</td><td><strong class="${remaining<0?"stock-negative":"stock-positive"}">${remaining.toLocaleString("en-IN")} g</strong></td><td><button class="status-btn" onclick="showStockUsageHistory('${escapeHtml(s.item)}','gram')">Usage</button></td></tr>`;
   }).join("")||"<tr><td colspan='6'>No stock records yet. Add a purchase first.</td></tr>";
 }
+
 
 async function addStockUsage(){
   const date=document.getElementById("stockUsageDate").value||new Date().toISOString().slice(0,10);
   const item=document.getElementById("stockUsageItem").value.trim();
   const quantity=Number(document.getElementById("stockUsageQuantity").value||0);
-  const unit=document.getElementById("stockUsageUnit").value;
+  const unit="gram";
   if(!item){alert("Enter the item name.");return;}
-  if(quantity<=0){alert("Enter a valid used quantity.");return;}
+  if(quantity<=0){alert("Enter a valid used quantity in grams.");return;}
   const [{data:purchases},{data:usage}]=await Promise.all([
-    supabaseClient.from("e2fit_purchases").select("quantity").ilike("item_name",item).eq("unit",unit),
-    supabaseClient.from("e2fit_stock_usage").select("quantity").ilike("item_name",item).eq("unit",unit)
+    supabaseClient.from("e2fit_purchases").select("quantity,unit").ilike("item_name",item).in("unit",["kg","gram"]),
+    supabaseClient.from("e2fit_stock_usage").select("quantity,unit").ilike("item_name",item).eq("unit","gram")
   ]);
-  const purchased=(purchases||[]).reduce((s,p)=>s+Number(p.quantity||0),0);
+  const purchased=(purchases||[]).reduce((s,p)=>s+(p.unit==="kg"?Number(p.quantity||0)*1000:Number(p.quantity||0)),0);
   const used=(usage||[]).reduce((s,u)=>s+Number(u.quantity||0),0);
   if(quantity>purchased-used){
-    alert(`Not enough stock. Available: ${(purchased-used).toLocaleString("en-IN")} ${unit}`);
+    alert(`Not enough stock. Available: ${(purchased-used).toLocaleString("en-IN")} grams`);
     return;
   }
   const {error}=await supabaseClient.from("e2fit_stock_usage").insert({usage_date:date,item_name:item,quantity,unit});
   if(error){alert("Could not record stock usage: "+error.message);return;}
   document.getElementById("stockUsageItem").value="";
   document.getElementById("stockUsageQuantity").value="";
-  document.getElementById("stockUsageUnit").value="kg";
+  document.getElementById("stockUsageUnit").value="gram";
   await loadStock();
 }
+
 
 async function showStockUsageHistory(item,unit){
   const {data,error}=await supabaseClient.from("e2fit_stock_usage").select("id,usage_date,quantity").ilike("item_name",item).eq("unit",unit).order("usage_date",{ascending:false});

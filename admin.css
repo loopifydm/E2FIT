@@ -24,3 +24,11 @@
   .finance-stats strong{font-size:21px}
   .purchase-form{grid-template-columns:1fr;padding:18px}
 }
+
+
+/* Stock management */
+.stock-form{grid-template-columns:1fr 1.5fr .9fr .9fr auto}
+.stock-positive{color:#2f6b3f}
+.stock-negative{color:#c0392b}
+@media(max-width:1000px){.stock-form{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:520px){.stock-form{grid-template-columns:1fr}}

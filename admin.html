@@ -15,12 +15,12 @@
 <button class="new-order" id="addPurchase">Add Purchase</button>
 </div>
 <div class="table-wrap"><table><thead><tr><th>Date</th><th>Item Name</th><th>Quantity</th><th>Unit</th><th>Price</th><th>Total Purchase</th><th>Action</th></tr></thead><tbody id="purchaseRows"></tbody></table></div></section>
-<section class="panel" id="stock"><div class="panel-head"><div><h2>Stock</h2><p>Purchase quantities are added to stock. Record daily usage to reduce the available quantity.</p></div></div>
+<section class="panel" id="stock"><div class="panel-head"><div><h2>Stock</h2><p>Stock is tracked in grams. Purchases in kg are automatically converted to grams.</p></div></div>
 <div class="purchase-form stock-form">
 <label>Date<input id="stockUsageDate" type="date"></label>
 <label>Item Name<input id="stockUsageItem" type="text" placeholder="e.g. Papaya, Groundnut, Cucumber"></label>
-<label>Used Quantity<input id="stockUsageQuantity" type="number" min="0.01" step="0.01" placeholder="Used quantity"></label>
-<label>Unit<select id="stockUsageUnit"><option>kg</option><option>gram</option><option>litre</option><option>ml</option><option>piece</option><option>dozen</option><option>packet</option><option>box</option><option>other</option></select></label>
+<label>Used Quantity<input id="stockUsageQuantity" type="number" min="0.01" step="0.01" placeholder="Used quantity in grams"></label>
+<label>Unit<select id="stockUsageUnit"><option value="gram">gram</option></select></label>
 <button class="new-order" id="addStockUsage">Record Usage</button>
 </div>
 <div class="table-wrap"><table><thead><tr><th>Item</th><th>Unit</th><th>Total Purchased</th><th>Used</th><th>Current Stock</th><th>Action</th></tr></thead><tbody id="stockRows"></tbody></table></div>

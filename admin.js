@@ -471,7 +471,7 @@ async function loadPurchases(){
   if(rows) rows.innerHTML=(data||[]).map(p=>`<tr>
     <td>${escapeHtml(p.purchase_date)}</td>
     <td><strong>${escapeHtml(p.item_name)}</strong></td>
-    <td>${Number(p.quantity).toLocaleString("en-IN")}</td>
+    <td>${Number(p.quantity).toLocaleString("en-IN")}</td><td>${escapeHtml(p.unit||"kg")}</td>
     <td>₹${Number(p.unit_price||0).toLocaleString("en-IN")}</td>
     <td><strong>₹${Number(p.total_amount||0).toLocaleString("en-IN")}</strong></td>
     <td><button class="status-btn" onclick="deletePurchase('${p.id}')">Delete</button></td>
@@ -494,15 +494,15 @@ async function addPurchase(){
   const date=document.getElementById("purchaseDate").value||new Date().toISOString().slice(0,10);
   const item=document.getElementById("purchaseItem").value.trim();
   const quantity=Number(document.getElementById("purchaseQuantity").value||0);
-  const price=Number(document.getElementById("purchasePrice").value||0);
+  const price=Number(document.getElementById("purchasePrice").value||0),unit=document.getElementById("purchaseUnit").value;
   if(!item){alert("Enter the item name.");return;}
   if(quantity<=0){alert("Enter a valid quantity.");return;}
   if(price<0){alert("Enter a valid price.");return;}
-  const {error}=await supabaseClient.from("e2fit_purchases").insert({purchase_date:date,item_name:item,quantity,unit_price:price});
+  const {error}=await supabaseClient.from("e2fit_purchases").insert({purchase_date:date,item_name:item,quantity,unit,unit_price:price});
   if(error){alert("Could not add purchase: "+error.message);return;}
   document.getElementById("purchaseItem").value="";
   document.getElementById("purchaseQuantity").value="";
-  document.getElementById("purchasePrice").value="";
+  document.getElementById("purchasePrice").value="";document.getElementById("purchaseUnit").value="kg";
   await loadPurchases();
 }
 

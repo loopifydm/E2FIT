@@ -39,7 +39,8 @@ document.getElementById("logout").addEventListener("click",async()=>{await supab
 
 function monthlyEndDate(startDate){let d=new Date(startDate+"T00:00:00"),count=0;while(count<26){if(d.getDay()!==0)count++;if(count<26)d.setDate(d.getDate()+1);}return d.toISOString().slice(0,10);}
 function weeklyEndDate(startDate){let d=new Date(startDate+"T00:00:00"),count=0;while(count<6){if(d.getDay()!==0)count++;if(count<6)d.setDate(d.getDate()+1);}return d.toISOString().slice(0,10);}
-async function refresh(){await generateToday();await loadEnquiries();await loadOrders();await loadCustomers();await loadSubscriptions();await loadSubscriberCalendarOptions();await loadInvoices();await loadPurchases();}
+async function refresh(){await generateToday();await loadEnquiries();await loadOrders();await loadCustomers();await loadSubscriptions();await loadSubscriberCalendarOptions();await loadInvoices();await loadPurchases();
+  await loadStock();}
 async function loadEnquiries(){
   const {data,error}=await supabaseClient.from("e2fit_enquiries").select("*").order("created_at",{ascending:false});
   if(error){console.error(error);return;}
@@ -464,6 +465,64 @@ function escapeHtml(value){return String(value??"").replace(/[&<>"']/g,c=>({"&":
 document.querySelectorAll("aside nav a").forEach(a=>a.addEventListener("click",e=>{e.preventDefault();const target=document.querySelector(a.getAttribute("href"));if(target){document.querySelectorAll("aside nav a").forEach(x=>x.classList.remove("active"));a.classList.add("active");target.scrollIntoView({behavior:"smooth",block:"start"});}}));
 boot();
 
+async function loadStock(){
+  const [{data:purchases,error:purchaseError},{data:usage,error:usageError}]=await Promise.all([
+    supabaseClient.from("e2fit_purchases").select("item_name,quantity,unit"),
+    supabaseClient.from("e2fit_stock_usage").select("id,usage_date,item_name,quantity,unit").order("usage_date",{ascending:false}).order("created_at",{ascending:false})
+  ]);
+  if(purchaseError){console.error(purchaseError);return;}
+  if(usageError){console.error(usageError);return;}
+  const map=new Map();
+  (purchases||[]).forEach(p=>{
+    const unit=p.unit||"kg", key=p.item_name.trim().toLowerCase()+"|"+unit;
+    if(!map.has(key))map.set(key,{item:p.item_name,unit,purchased:0,used:0});
+    map.get(key).purchased+=Number(p.quantity||0);
+  });
+  (usage||[]).forEach(u=>{
+    const unit=u.unit||"kg", key=u.item_name.trim().toLowerCase()+"|"+unit;
+    if(!map.has(key))map.set(key,{item:u.item_name,unit,purchased:0,used:0});
+    map.get(key).used+=Number(u.quantity||0);
+  });
+  const rows=document.getElementById("stockRows");
+  const entries=[...map.values()].sort((a,b)=>a.item.localeCompare(b.item));
+  if(rows) rows.innerHTML=entries.map(s=>{
+    const remaining=s.purchased-s.used;
+    return `<tr><td><strong>${escapeHtml(s.item)}</strong></td><td>${escapeHtml(s.unit)}</td><td>${s.purchased.toLocaleString("en-IN")}</td><td>${s.used.toLocaleString("en-IN")}</td><td><strong class="${remaining<0?"stock-negative":"stock-positive"}">${remaining.toLocaleString("en-IN")}</strong></td><td><button class="status-btn" onclick="showStockUsageHistory('${escapeHtml(s.item)}','${escapeHtml(s.unit)}')">Usage</button></td></tr>`;
+  }).join("")||"<tr><td colspan='6'>No stock records yet. Add a purchase first.</td></tr>";
+}
+
+async function addStockUsage(){
+  const date=document.getElementById("stockUsageDate").value||new Date().toISOString().slice(0,10);
+  const item=document.getElementById("stockUsageItem").value.trim();
+  const quantity=Number(document.getElementById("stockUsageQuantity").value||0);
+  const unit=document.getElementById("stockUsageUnit").value;
+  if(!item){alert("Enter the item name.");return;}
+  if(quantity<=0){alert("Enter a valid used quantity.");return;}
+  const [{data:purchases},{data:usage}]=await Promise.all([
+    supabaseClient.from("e2fit_purchases").select("quantity").ilike("item_name",item).eq("unit",unit),
+    supabaseClient.from("e2fit_stock_usage").select("quantity").ilike("item_name",item).eq("unit",unit)
+  ]);
+  const purchased=(purchases||[]).reduce((s,p)=>s+Number(p.quantity||0),0);
+  const used=(usage||[]).reduce((s,u)=>s+Number(u.quantity||0),0);
+  if(quantity>purchased-used){
+    alert(`Not enough stock. Available: ${(purchased-used).toLocaleString("en-IN")} ${unit}`);
+    return;
+  }
+  const {error}=await supabaseClient.from("e2fit_stock_usage").insert({usage_date:date,item_name:item,quantity,unit});
+  if(error){alert("Could not record stock usage: "+error.message);return;}
+  document.getElementById("stockUsageItem").value="";
+  document.getElementById("stockUsageQuantity").value="";
+  document.getElementById("stockUsageUnit").value="kg";
+  await loadStock();
+}
+
+async function showStockUsageHistory(item,unit){
+  const {data,error}=await supabaseClient.from("e2fit_stock_usage").select("id,usage_date,quantity").ilike("item_name",item).eq("unit",unit).order("usage_date",{ascending:false});
+  if(error){alert(error.message);return;}
+  if(!data?.length){alert("No usage recorded for this item.");return;}
+  alert(data.map(u=>`${u.usage_date}: ${Number(u.quantity).toLocaleString("en-IN")} ${unit}`).join("\n"));
+}
+
 async function loadPurchases(){
   const {data,error}=await supabaseClient.from("e2fit_purchases").select("*").order("purchase_date",{ascending:false}).order("created_at",{ascending:false});
   if(error){console.error(error);return;}
@@ -515,3 +574,5 @@ async function deletePurchase(id){
 
 document.getElementById("purchaseDate").value=new Date().toISOString().slice(0,10);
 document.getElementById("addPurchase").addEventListener("click",addPurchase);
+document.getElementById("stockUsageDate").value=new Date().toISOString().slice(0,10);
+document.getElementById("addStockUsage").addEventListener("click",addStockUsage);

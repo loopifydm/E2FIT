@@ -40,6 +40,7 @@ document.getElementById("logout").addEventListener("click",async()=>{await supab
 function monthlyEndDate(startDate){let d=new Date(startDate+"T00:00:00"),count=0;while(count<26){if(d.getDay()!==0)count++;if(count<26)d.setDate(d.getDate()+1);}return d.toISOString().slice(0,10);}
 function weeklyEndDate(startDate){let d=new Date(startDate+"T00:00:00"),count=0;while(count<6){if(d.getDay()!==0)count++;if(count<6)d.setDate(d.getDate()+1);}return d.toISOString().slice(0,10);}
 async function refresh(){await generateToday();await loadEnquiries();await loadOrders();await loadCustomers();await loadSubscriptions();await loadSubscriberCalendarOptions();await loadInvoices();await loadPurchases();
+  await loadAdminReviews();
   await loadStock();}
 async function loadEnquiries(){
   const {data,error}=await supabaseClient.from("e2fit_enquiries").select("*").order("created_at",{ascending:false});
@@ -528,6 +529,24 @@ async function showStockUsageHistory(item,unit){
   if(error){alert(error.message);return;}
   if(!data?.length){alert("No usage recorded for this item.");return;}
   alert(data.map(u=>`${u.usage_date}: ${Number(u.quantity).toLocaleString("en-IN")} ${unit}`).join("\n"));
+}
+
+async function loadAdminReviews(){
+  const {data,error}=await supabaseClient.from("e2fit_reviews").select("*").order("created_at",{ascending:false});
+  if(error){console.error(error);return;}
+  const rows=document.getElementById("reviewAdminRows");
+  if(rows) rows.innerHTML=(data||[]).map(r=>`<tr><td><strong>${escapeHtml(r.customer_name)}</strong></td><td>${"★".repeat(Number(r.rating||0))}</td><td style="max-width:360px;white-space:normal">${escapeHtml(r.review_text)}</td><td>${escapeHtml(r.box||"-")}</td><td><select onchange="updateReviewStatus('${r.id}',this.value)"><option ${r.status==="Pending"?"selected":""}>Pending</option><option ${r.status==="Approved"?"selected":""}>Approved</option><option ${r.status==="Rejected"?"selected":""}>Rejected</option></select></td><td><button class="status-btn" onclick="deleteReview('${r.id}')">Delete</button></td></tr>`).join("")||"<tr><td colspan='6'>No customer reviews yet.</td></tr>";
+}
+async function updateReviewStatus(id,status){
+  const {error}=await supabaseClient.from("e2fit_reviews").update({status,updated_at:new Date().toISOString()}).eq("id",id);
+  if(error){alert("Could not update review: "+error.message);return;}
+  await loadAdminReviews();
+}
+async function deleteReview(id){
+  if(!confirm("Delete this customer review?"))return;
+  const {error}=await supabaseClient.from("e2fit_reviews").delete().eq("id",id);
+  if(error){alert("Could not delete review: "+error.message);return;}
+  await loadAdminReviews();
 }
 
 async function loadPurchases(){

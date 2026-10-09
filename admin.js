@@ -271,7 +271,11 @@ async function toggleCalendarDelivery(input){
         .update({status,subscription_id:sub.id,box:sub.box,updated_at:new Date().toISOString()})
         .eq("id",existing.id);
     }else{
-      result=await supabaseClient.from("e2fit_deliveries").insert(payload).select("id").single();
+      // Atomic upsert protects against duplicate customer/date/time rows if a
+      // delivery was created between the lookup and the save.
+      result=await supabaseClient.from("e2fit_deliveries")
+        .upsert(payload,{onConflict:"customer_id,delivery_date,delivery_time"})
+        .select("id").single();
     }
   }
   if(result.error){alert("Could not save delivery status: "+result.error.message);input.checked=!input.checked;return;}

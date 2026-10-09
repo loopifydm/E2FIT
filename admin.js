@@ -250,8 +250,30 @@ async function toggleCalendarDelivery(input){
   if(!sub)return;
   const payload={subscription_id:sub.id,customer_id:sub.customer_id||null,delivery_date:input.dataset.date,delivery_time:sub.delivery_time,box:sub.box,address:"",status,updated_at:new Date().toISOString()};
   let result;
-  if(input.dataset.deliveryId) result=await supabaseClient.from("e2fit_deliveries").update({status,updated_at:new Date().toISOString()}).eq("id",input.dataset.deliveryId);
-  else result=await supabaseClient.from("e2fit_deliveries").insert(payload).select("id").single();
+  if(input.dataset.deliveryId){
+    result=await supabaseClient.from("e2fit_deliveries").update({status,updated_at:new Date().toISOString()}).eq("id",input.dataset.deliveryId);
+  }else{
+    // A delivery may already exist for this customer/date/time even if the
+    // calendar cell did not receive its delivery ID. Reuse it to avoid the
+    // unique customer/date/time constraint.
+    const {data:existing,error:lookupError}=await supabaseClient
+      .from("e2fit_deliveries").select("id,subscription_id")
+      .eq("customer_id",sub.customer_id)
+      .eq("delivery_date",input.dataset.date)
+      .eq("delivery_time",sub.delivery_time)
+      .maybeSingle();
+    if(lookupError){
+      alert("Could not check existing delivery: "+lookupError.message);
+      input.checked=!input.checked;return;
+    }
+    if(existing){
+      result=await supabaseClient.from("e2fit_deliveries")
+        .update({status,subscription_id:sub.id,box:sub.box,updated_at:new Date().toISOString()})
+        .eq("id",existing.id);
+    }else{
+      result=await supabaseClient.from("e2fit_deliveries").insert(payload).select("id").single();
+    }
+  }
   if(result.error){alert("Could not save delivery status: "+result.error.message);input.checked=!input.checked;return;}
 
   // Monthly/Weekly plans carry forward missed days. Trial plans keep the

@@ -35,6 +35,8 @@ self.addEventListener("fetch", event => {
   const request = event.request;
   const url = new URL(request.url);
   if (request.method !== "GET" || url.origin !== self.location.origin) return;
+  const adminAsset = url.pathname.endsWith("/admin.html") || url.pathname.endsWith("/admin.css") || url.pathname.endsWith("/admin.js") || url.pathname.endsWith("/supabase-config.js") || url.pathname.endsWith("/admin.webmanifest") || url.pathname.endsWith("/e2fit-logo.jpg") || url.pathname.endsWith("/e2fit-logo.png") || url.pathname.endsWith("/e2fit-pwa-icon.svg");
+  if (!adminAsset) return;
 
   if (request.mode === "navigate" && url.pathname.endsWith("/admin.html")) {
     event.respondWith(

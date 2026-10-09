@@ -290,8 +290,11 @@ async function toggleCalendarDelivery(input){
     }
   }
   await renderSubscriberCalendar();
+  await generateToday();
+  await loadOrders();
   await loadSubscriptions();
   await loadCustomers();
+  await loadSubscriberCalendarOptions();
 }
 
 function render(){
@@ -446,7 +449,14 @@ async function generateInvoice(){
     result=await supabaseClient.from("e2fit_invoices").update(payload).eq("id",editingInvoiceId);
     if(result.error){alert("Could not update invoice: "+result.error.message);return;}
     try{await syncSubscriberFromInvoice(editingInvoiceId,invoiceData);}catch(error){alert("Invoice updated, but subscriber sync failed: "+(error.message||"Unknown error"));return;}
-    await renderInvoice(invoiceNo);await loadInvoices();await loadOrders();await loadCustomers();await loadSubscriptions();await loadSubscriberCalendarOptions();
+    await renderInvoice(invoiceNo);
+    await loadInvoices();
+    await generateToday();
+    await loadOrders();
+    await loadCustomers();
+    await loadSubscriptions();
+    await loadSubscriberCalendarOptions();
+    await renderSubscriberCalendar();
     editingInvoiceId=null;editingInvoiceNumber=null;
     document.getElementById("generateInvoice").textContent="Generate Invoice";
     return;
@@ -464,6 +474,12 @@ async function generateInvoice(){
   }
   await renderInvoice(invoiceNo);
   await loadInvoices();
+  await generateToday();
+  await loadOrders();
+  await loadCustomers();
+  await loadSubscriptions();
+  await loadSubscriberCalendarOptions();
+  await renderSubscriberCalendar();
   editingInvoiceId=null;editingInvoiceNumber=null;
   document.getElementById("generateInvoice").textContent="Generate Invoice";
 }

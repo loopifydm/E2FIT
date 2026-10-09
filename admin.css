@@ -49,3 +49,17 @@
 #invoiceHistory .invoice-actions-cell .status-btn{margin:2px 3px 2px 0;min-width:42px}
 #invoiceHistory tbody tr:hover{background:#fbfdf8}
 @media(max-width:700px){#invoiceHistory td{padding:12px 10px}#invoiceHistory .invoice-actions-cell .status-btn{padding:8px 9px;font-size:10px}}
+
+
+/* Active subscriptions table layout */
+#subscriptions .table-wrap{overflow-x:auto}
+#subscriptions table{width:100%;min-width:850px;border-collapse:separate;border-spacing:0}
+#subscriptions th{white-space:nowrap}
+#subscriptions td{padding:16px 22px;vertical-align:middle;line-height:1.45}
+#subscriptions .subscription-customer{min-width:185px}
+#subscriptions .subscription-customer strong{display:block;color:#173f2b;font-size:13px;font-weight:800;line-height:1.4;white-space:normal}
+#subscriptions .subscription-customer small{display:block;margin-top:5px;color:#748277;font-size:11px;line-height:1.4;white-space:nowrap}
+#subscriptions .subscription-plan{display:inline-block;padding:5px 9px;border-radius:8px;background:#f1f6e7;color:#315f3b;font-size:11px;font-weight:700;white-space:nowrap}
+#subscriptions .subscription-date{font-variant-numeric:tabular-nums;white-space:nowrap;color:#40584a}
+#subscriptions tbody tr:hover{background:#fbfdf8}
+@media(max-width:700px){#subscriptions td{padding:13px 14px}}

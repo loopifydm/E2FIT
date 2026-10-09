@@ -34,3 +34,22 @@ Open /admin.html from the deployed GitHub Pages site and sign in with an existin
 - Replace placeholder WhatsApp links with the official E2FIT WhatsApp number.
 - Add the final E2FIT logo and product photographs.
 - Confirm the Supabase admin account before sharing the admin URL.
+
+## E2FIT Admin PWA
+
+The admin panel at `admin.html` has an installable PWA manifest and a service worker for caching the admin app shell.
+
+Files added:
+- `admin.webmanifest` — install name, standalone display, theme and launch URL.
+- `admin-service-worker.js` — caches the admin shell and its local assets, with an offline navigation fallback.
+- `assets/e2fit-pwa-icon.svg` — icon used by the installed admin app.
+
+### Install on Android
+
+1. Publish the repository through GitHub Pages under **Settings → Pages** (main branch, root folder).
+2. Open the HTTPS URL ending in `/admin.html` in Chrome on Android.
+3. Load it once while online; then use Chrome's menu and choose **Install app** or **Add to Home screen**.
+
+### Offline limitations
+
+The service worker can cache the admin page and local files, but admin sign-in, orders, subscriptions, invoices and other Supabase data require internet access. The Supabase and jsPDF scripts are loaded from a CDN and are not bundled for offline use. This PWA does not make the admin database available offline or synchronize local offline edits.

@@ -32,3 +32,20 @@
 .stock-negative{color:#c0392b}
 @media(max-width:1000px){.stock-form{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:520px){.stock-form{grid-template-columns:1fr}}
+
+
+/* Invoice history readability */
+#invoiceHistory .table-wrap{overflow-x:auto}
+#invoiceHistory table{width:100%;border-collapse:separate;border-spacing:0}
+#invoiceHistory th{white-space:nowrap}
+#invoiceHistory td{padding:15px 18px;vertical-align:middle}
+#invoiceHistory .invoice-number{font-weight:800;letter-spacing:.15px;color:#174a2a;white-space:nowrap}
+#invoiceHistory .invoice-customer-cell strong{display:block;font-size:13px;font-weight:700;color:#173f2b;line-height:1.4;white-space:normal}
+#invoiceHistory .invoice-customer-cell small,
+#invoiceHistory .invoice-plan-type{display:block;margin-top:4px;font-size:11px;color:#758378;line-height:1.4;white-space:nowrap}
+#invoiceHistory .invoice-plan-label{display:block;font-size:12px;font-weight:600;color:#234532;white-space:normal}
+#invoiceHistory .invoice-amount{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+#invoiceHistory .invoice-actions-cell{white-space:nowrap}
+#invoiceHistory .invoice-actions-cell .status-btn{margin:2px 3px 2px 0;min-width:42px}
+#invoiceHistory tbody tr:hover{background:#fbfdf8}
+@media(max-width:700px){#invoiceHistory td{padding:12px 10px}#invoiceHistory .invoice-actions-cell .status-btn{padding:8px 9px;font-size:10px}}

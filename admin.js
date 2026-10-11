@@ -535,7 +535,7 @@ function printInvoice(){
 }
 document.getElementById("invoiceBox").addEventListener("change",updateInvoiceAmount);
 document.getElementById("invoicePlan").addEventListener("change",()=>{if(invoicePlanKey()==="Trial")document.getElementById("invoiceAmount").value="0";updateInvoiceAmount();updateInvoicePlanDates();});document.getElementById("invoiceStartDate").addEventListener("change",updateInvoicePlanDates);
-document.getElementById("invoiceDeliveryTime").addEventListener("change",()=>{if(document.getElementById("invoiceCustomer").value.trim())renderInvoice(editingInvoiceNumber||null);});document.getElementById("invoiceAdvance").addEventListener("input",updateInvoiceBalance);document.getElementById("invoiceAmount").addEventListener("input",updateInvoiceBalance);document.getElementById("generateInvoice").addEventListener("click",generateInvoice);
+document.getElementById("invoiceDeliveryTime").addEventListener("change",()=>{if(document.getElementById("invoiceCustomer").value.trim())renderInvoice(editingInvoiceNumber||null);});document.getElementById("invoiceAdvance").addEventListener("input",()=>{const total=Number(document.getElementById("invoiceAmount").value||0),advance=Number(document.getElementById("invoiceAdvance").value||0);if(advance>total&&document.getElementById("invoicePaid"))document.getElementById("invoicePaid").checked=false;updateInvoiceBalance();});document.getElementById("invoiceAmount").addEventListener("input",updateInvoiceBalance);document.getElementById("generateInvoice").addEventListener("click",generateInvoice);
 document.getElementById("printInvoice").addEventListener("click",printInvoice);
 document.getElementById("invoiceDate").value=new Date().toISOString().slice(0,10);
 updateInvoiceAmount();updateInvoicePlanDates();

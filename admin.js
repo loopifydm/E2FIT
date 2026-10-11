@@ -330,6 +330,8 @@ let editingInvoiceId=null,editingInvoiceNumber=null;
 async function editInvoice(id){
   const {data,error}=await supabaseClient.from("e2fit_invoices").select("*").eq("id",id).single();if(error){alert(error.message);return;}
   editingInvoiceId=id;editingInvoiceNumber=data.invoice_number;
+  window.E2FIT_CREDIT_APPLIED=Math.max(0,Number(data.credit_applied||0));
+  const paidCheckbox=document.getElementById("invoicePaid");if(paidCheckbox)paidCheckbox.checked=false;
   document.getElementById("invoiceCustomer").value=data.customer_name||"";document.getElementById("invoicePhone").value=data.phone||"";document.getElementById("invoiceAddress").value=data.address||"";document.getElementById("invoiceBox").value=data.box||"Mixed Box";document.getElementById("invoicePlan").value=data.plan==="Weekly"?"Weekly (6 days)":data.plan==="Monthly"?"Monthly (26 days)":data.plan==="Trial"?"Trial (Custom Dates)":"Daily";document.getElementById("invoiceDeliveryTime").value=data.delivery_time||"Breakfast";document.getElementById("invoiceAmount").value=data.amount;document.getElementById("invoiceStartDate").value=data.start_date||data.invoice_date;document.getElementById("invoiceEndDate").value=data.end_date||data.invoice_date;document.getElementById("invoiceAdvance").value=data.advance_amount||0;document.getElementById("invoiceBalance").value=data.balance_amount??Math.max(0,Number(data.amount||0)-Number(data.advance_amount||0));updateInvoiceBalance();document.getElementById("invoiceDate").value=data.invoice_date;updateInvoiceAmount();updateInvoicePlanDates();
   document.getElementById("generateInvoice").textContent="Update Invoice";document.getElementById("invoices").scrollIntoView({behavior:"smooth"});await renderInvoice(data.invoice_number);
 }

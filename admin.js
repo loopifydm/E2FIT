@@ -166,7 +166,7 @@ async function downloadSubscriberCalendarPDF(){
   const start=monthStart>sub.start_date?monthStart:sub.start_date;
   const end=monthEnd<effectiveEnd?monthEnd:effectiveEnd;
   const targetDays=subscriberTargetDays(sub.plan,sub.start_date,sub.end_date);
-  const deliveredCount=(records||[]).filter(r=>r.status==="Delivered"&&r.delivery_date>=sub.start_date&&r.delivery_date<=effectiveEnd).length;
+  const deliveredCount=new Set((records||[]).filter(r=>r.status==="Delivered"&&r.delivery_date>=sub.start_date&&r.delivery_date<=effectiveEnd&&new Date(r.delivery_date+"T12:00:00Z").getUTCDay()!==0).map(r=>r.delivery_date)).size;
   const byDate={};
   (records||[]).forEach(r=>{const current=byDate[r.delivery_date];if(!current||r.status==="Delivered"&&current.status!=="Delivered")byDate[r.delivery_date]=r;});
 

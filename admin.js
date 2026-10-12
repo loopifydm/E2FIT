@@ -115,17 +115,17 @@ async function renderSubscriberCalendar(){
   if(!monthValue)monthValue=new Date().toISOString().slice(0,7);
   document.getElementById("calendarMonth").value=monthValue;
 
-  const {data:allRecords,error}=await supabaseClient.from("e2fit_deliveries").select("id,delivery_date,status").eq("subscription_id",sub.id).gte("delivery_date",sub.start_date).order("delivery_date",{ascending:true});
+  const {data:allRecords,error}=await supabaseClient.from("e2fit_deliveries").select("id,subscription_id,customer_id,box,delivery_time,delivery_date,status").eq("customer_id",sub.customer_id).eq("delivery_time",sub.delivery_time).eq("box",sub.box).gte("delivery_date",sub.start_date).order("delivery_date",{ascending:true});
   if(error){console.error(error);box.innerHTML='<div class="calendar-empty">Could not load delivery calendar.</div>';return;}
 
   const records=allRecords||[],effectiveEnd=subscriberEffectiveEnd(sub.start_date,sub.plan,records,sub.end_date),byDate={};
-  records.forEach(r=>{if(new Date(r.delivery_date+"T12:00:00Z").getUTCDay()!==0)byDate[r.delivery_date]=r;});
+  records.forEach(r=>{if(new Date(r.delivery_date+"T12:00:00Z").getUTCDay()===0)return;const current=byDate[r.delivery_date];if(!current||r.status==="Delivered"&&current.status!=="Delivered")byDate[r.delivery_date]=r;});
 
   const monthStart=monthValue+"-01",monthEnd=new Date(Number(monthValue.slice(0,4)),Number(monthValue.slice(5,7)),0).toISOString().slice(0,10);
   const start=monthStart>sub.start_date?monthStart:sub.start_date,end=monthEnd<effectiveEnd?monthEnd:effectiveEnd;
   if(start>end){box.innerHTML='<div class="calendar-empty">No delivery days for this month.</div>';return;}
 
-  const deliveredCount=records.filter(r=>r.status==="Delivered" && r.delivery_date>=sub.start_date && r.delivery_date<=effectiveEnd).length;
+  const deliveredCount=new Set(records.filter(r=>r.status==="Delivered" && r.delivery_date>=sub.start_date && r.delivery_date<=effectiveEnd && new Date(r.delivery_date+"T12:00:00Z").getUTCDay()!==0).map(r=>r.delivery_date)).size;
   const remaining=Math.max(0,targetDays-deliveredCount);
 
   const dates=[];let d=new Date(start+"T12:00:00Z"),last=new Date(end+"T12:00:00Z");
@@ -152,8 +152,10 @@ async function downloadSubscriberCalendarPDF(){
   if(!window.jspdf?.jsPDF){alert("PDF generator is still loading. Please try again.");return;}
 
   const {data:records,error}=await supabaseClient.from("e2fit_deliveries")
-    .select("delivery_date,status")
-    .eq("subscription_id",sub.id)
+    .select("delivery_date,status,box,delivery_time")
+    .eq("customer_id",sub.customer_id)
+    .eq("delivery_time",sub.delivery_time)
+    .eq("box",sub.box)
     .gte("delivery_date",sub.start_date)
     .order("delivery_date",{ascending:true});
   if(error){alert("Could not load calendar data: "+error.message);return;}
@@ -166,7 +168,7 @@ async function downloadSubscriberCalendarPDF(){
   const targetDays=subscriberTargetDays(sub.plan,sub.start_date,sub.end_date);
   const deliveredCount=(records||[]).filter(r=>r.status==="Delivered"&&r.delivery_date>=sub.start_date&&r.delivery_date<=effectiveEnd).length;
   const byDate={};
-  (records||[]).forEach(r=>{byDate[r.delivery_date]=r;});
+  (records||[]).forEach(r=>{const current=byDate[r.delivery_date];if(!current||r.status==="Delivered"&&current.status!=="Delivered")byDate[r.delivery_date]=r;});
 
   const dates=[];
   if(start<=end){

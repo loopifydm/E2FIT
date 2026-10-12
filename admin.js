@@ -555,29 +555,31 @@ async function loadStock(){
   if(purchaseError){console.error(purchaseError);return;}
   if(usageError){console.error(usageError);return;}
   const map=new Map();
-  const toGrams=(qty,unit)=>unit==="kg"?Number(qty||0)*1000:unit==="gram"?Number(qty||0):null;
-  (purchases||[]).forEach(p=>{
-    const grams=toGrams(p.quantity,p.unit);
-    if(grams===null)return;
-    const key=p.item_name.trim().toLowerCase();
-    if(!map.has(key))map.set(key,{item:p.item_name,purchased:0,used:0});
-    map.get(key).purchased+=grams;
-  });
-  (usage||[]).forEach(u=>{
-    const grams=toGrams(u.quantity,u.unit);
-    if(grams===null)return;
-    const key=u.item_name.trim().toLowerCase();
-    if(!map.has(key))map.set(key,{item:u.item_name,purchased:0,used:0});
-    map.get(key).used+=grams;
-  });
+  const unitInfo=(qty,unit)=>{
+    const u=String(unit||"other").toLowerCase();
+    if(u==="kg")return {key:"weight",qty:Number(qty||0)*1000,label:"gram"};
+    if(u==="gram"||u==="g")return {key:"weight",qty:Number(qty||0),label:"gram"};
+    if(u==="litre"||u==="liter"||u==="l")return {key:"volume",qty:Number(qty||0)*1000,label:"ml"};
+    if(u==="ml")return {key:"volume",qty:Number(qty||0),label:"ml"};
+    if(u==="dozen")return {key:"count",qty:Number(qty||0)*12,label:"piece"};
+    if(u==="piece"||u==="pieces")return {key:"count",qty:Number(qty||0),label:"piece"};
+    return {key:"unit:"+u,qty:Number(qty||0),label:u};
+  };
+  const add=(item,qty,unit,field)=>{
+    const info=unitInfo(qty,unit),name=String(item||"").trim(),key=name.toLowerCase()+"::"+info.key;
+    if(!map.has(key))map.set(key,{item:name,unit:info.label,purchased:0,used:0});
+    map.get(key)[field]+=info.qty;
+  };
+  (purchases||[]).forEach(p=>add(p.item_name,p.quantity,p.unit,"purchased"));
+  (usage||[]).forEach(u=>add(u.item_name,u.quantity,u.unit,"used"));
   const rows=document.getElementById("stockRows");
-  const entries=[...map.values()].sort((a,b)=>a.item.localeCompare(b.item));
-  if(rows) rows.innerHTML=entries.map(s=>{
-    const remaining=s.purchased-s.used;
-    return `<tr><td><strong>${escapeHtml(s.item)}</strong></td><td>gram</td><td>${s.purchased.toLocaleString("en-IN")} g</td><td>${s.used.toLocaleString("en-IN")} g</td><td><strong class="${remaining<0?"stock-negative":"stock-positive"}">${remaining.toLocaleString("en-IN")} g</strong></td><td><button class="status-btn" onclick="showStockUsageHistory('${escapeHtml(s.item)}','gram')">Usage</button></td></tr>`;
+  const entries=[...map.values()].sort((a,b)=>a.item.localeCompare(b.item)||a.unit.localeCompare(b.unit));
+  if(rows)rows.innerHTML=entries.map(s=>{
+    const remaining=s.purchased-s.used,display=v=>Number(v||0).toLocaleString("en-IN",{maximumFractionDigits:2});
+    const usageAction=s.unit==="gram"?`<button class="status-btn" onclick="showStockUsageHistory('${escapeHtml(s.item)}','gram')">Usage</button>`:"—";
+    return `<tr><td><strong>${escapeHtml(s.item)}</strong></td><td>${escapeHtml(s.unit)}</td><td>${display(s.purchased)} ${escapeHtml(s.unit)}</td><td>${display(s.used)} ${escapeHtml(s.unit)}</td><td><strong class="${remaining<0?"stock-negative":"stock-positive"}">${display(remaining)} ${escapeHtml(s.unit)}</strong></td><td>${usageAction}</td></tr>`;
   }).join("")||"<tr><td colspan='6'>No stock records yet. Add a purchase first.</td></tr>";
 }
-
 
 async function addStockUsage(){
   const date=document.getElementById("stockUsageDate").value||new Date().toISOString().slice(0,10);
@@ -670,6 +672,7 @@ async function addPurchase(){
   document.getElementById("purchaseQuantity").value="";
   document.getElementById("purchasePrice").value="";document.getElementById("purchaseUnit").value="kg";
   await loadPurchases();
+  await loadStock();
 }
 
 async function deletePurchase(id){
@@ -677,6 +680,7 @@ async function deletePurchase(id){
   const {error}=await supabaseClient.from("e2fit_purchases").delete().eq("id",id);
   if(error){alert("Could not delete purchase: "+error.message);return;}
   await loadPurchases();
+  await loadStock();
 }
 
 document.getElementById("purchaseDate").value=new Date().toISOString().slice(0,10);

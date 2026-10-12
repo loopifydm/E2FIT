@@ -585,14 +585,16 @@ async function addStockUsage(){
   const date=document.getElementById("stockUsageDate").value||new Date().toISOString().slice(0,10);
   const item=document.getElementById("stockUsageItem").value.trim();
   const quantity=Number(document.getElementById("stockUsageQuantity").value||0);
-  const unit="gram";
+  const unit=document.getElementById("stockUsageUnit").value||"gram";
   if(!item){alert("Enter the item name.");return;}
   if(quantity<=0){alert("Enter a valid used quantity in grams.");return;}
+  const compatible=unit==="gram"?["kg","gram"]:unit==="piece"?["piece","dozen"]:unit==="ml"?["litre","liter","l","ml"]:[unit];
   const [{data:purchases},{data:usage}]=await Promise.all([
-    supabaseClient.from("e2fit_purchases").select("quantity,unit").ilike("item_name",item).in("unit",["kg","gram"]),
-    supabaseClient.from("e2fit_stock_usage").select("quantity,unit").ilike("item_name",item).eq("unit","gram")
+    supabaseClient.from("e2fit_purchases").select("quantity,unit").ilike("item_name",item).in("unit",compatible),
+    supabaseClient.from("e2fit_stock_usage").select("quantity,unit").ilike("item_name",item).in("unit",unit==="gram"?["gram"]:unit==="piece"?["piece"]:unit==="ml"?["ml"]:[unit])
   ]);
-  const purchased=(purchases||[]).reduce((s,p)=>s+(p.unit==="kg"?Number(p.quantity||0)*1000:Number(p.quantity||0)),0);
+  const convert=(qty,u)=>u==="kg"?Number(qty||0)*1000:(u==="litre"||u==="liter"||u==="l")?Number(qty||0)*1000:u==="dozen"?Number(qty||0)*12:Number(qty||0);
+  const purchased=(purchases||[]).reduce((s,p)=>s+convert(p.quantity,p.unit),0);
   const used=(usage||[]).reduce((s,u)=>s+Number(u.quantity||0),0);
   if(quantity>purchased-used){
     alert(`Not enough stock. Available: ${(purchased-used).toLocaleString("en-IN")} grams`);

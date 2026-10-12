@@ -634,6 +634,36 @@ async function deleteReview(id){
   await loadAdminReviews();
 }
 
+function downloadAdminTablePDF(tbodyId,title,filename){
+  if(!window.jspdf?.jsPDF){alert("PDF generator is still loading. Please try again.");return;}
+  const tbody=document.getElementById(tbodyId),table=tbody?.closest("table");
+  if(!tbody||!table){alert("Could not find the report table.");return;}
+  const headers=Array.from(table.querySelectorAll("thead th")).map(th=>th.innerText.trim());
+  const rows=Array.from(tbody.querySelectorAll("tr")).map(tr=>Array.from(tr.querySelectorAll("td")).map(td=>td.innerText.trim()));
+  const validRows=rows.filter(row=>row.length&&!/^No (purchases|stock records)/i.test(row.join(" ")));
+  if(!validRows.length){alert("There are no records to export yet.");return;}
+  const {jsPDF}=window.jspdf,pdf=new jsPDF({orientation:"landscape",unit:"mm",format:"a4"});
+  const pageWidth=pdf.internal.pageSize.getWidth(),pageHeight=pdf.internal.pageSize.getHeight(),margin=12,usableWidth=pageWidth-margin*2,colWidth=usableWidth/headers.length;
+  let y=14;
+  const drawHeader=()=>{
+    pdf.setTextColor(23,63,43);pdf.setFont("helvetica","bold");pdf.setFontSize(16);pdf.text(title,margin,y);y+=7;
+    pdf.setFont("helvetica","normal");pdf.setFontSize(8);pdf.setTextColor(95,95,95);pdf.text("Generated: "+new Date().toLocaleString("en-IN"),margin,y);y+=5;
+    pdf.setFillColor(239,247,231);pdf.setDrawColor(205,215,203);
+    const headerLines=headers.map(t=>pdf.splitTextToSize(t,Math.max(10,colWidth-4)));
+    const hh=Math.max(7,...headerLines.map(a=>a.length*3.5+3));let x=margin;
+    headers.forEach((t,i)=>{pdf.rect(x,y,colWidth,hh,"FD");pdf.setTextColor(23,63,43);pdf.setFont("helvetica","bold");pdf.setFontSize(8);pdf.text(headerLines[i],x+2,y+4);x+=colWidth;});y+=hh;
+  };
+  drawHeader();pdf.setFont("helvetica","normal");pdf.setFontSize(8);
+  validRows.forEach(row=>{
+    const cells=headers.map((_,i)=>String(row[i]||"—").replace(/\s+/g," ").trim());
+    const lines=cells.map(t=>pdf.splitTextToSize(t,Math.max(10,colWidth-4)));
+    const rh=Math.max(7,...lines.map(a=>a.length*3.5+3));
+    if(y+rh>pageHeight-12){pdf.addPage();y=14;drawHeader();pdf.setFont("helvetica","normal");pdf.setFontSize(8);}
+    let x=margin;cells.forEach((t,i)=>{pdf.setDrawColor(220,224,219);pdf.rect(x,y,colWidth,rh);pdf.setTextColor(45,50,46);pdf.text(lines[i],x+2,y+4);x+=colWidth;});y+=rh;
+  });
+  const pageCount=pdf.internal.getNumberOfPages();for(let p=1;p<=pageCount;p++){pdf.setPage(p);pdf.setFontSize(8);pdf.setTextColor(120,120,120);pdf.text("E2FIT · Page "+p+" of "+pageCount,pageWidth-margin,pageHeight-5,{align:"right"});}
+  pdf.save(filename);
+}
 async function loadPurchases(){
   const {data,error}=await supabaseClient.from("e2fit_purchases").select("*").order("purchase_date",{ascending:false}).order("created_at",{ascending:false});
   if(error){console.error(error);return;}
